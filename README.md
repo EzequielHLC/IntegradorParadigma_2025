@@ -15,7 +15,7 @@ La secuencia paso a paso que vamos a usar para hacer funcionar esta cosa :D
 ### Paso 1: Crear el proyecto
 
 ```bash
-npm create vite@latest mh-planner -- --template react
+npm create vite@latest proyecto_final_paradigma -- --template react
 ```
 
 1. Seleccionar la Opción `React`
