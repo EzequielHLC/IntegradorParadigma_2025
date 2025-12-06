@@ -8,6 +8,23 @@
 
 La secuencia paso a paso que vamos a usar para hacer funcionar esta cosa :D
 
+Normalmente solo deberían ejecutar el siguiente comando y deberían de tener disponible todo para ejecutar el programa
+
+```bash
+npm install
+```
+
+Y para lanzar el programa:
+
+
+```bash
+npm run dev
+```
+
+---
+
+Pero, en caso de no funcionar, este el proceso para crear el proyecto desde cero
+
 ![Alt text](/MD/cat-dynamic-programming.gif "Optional Title")
 
 ---
