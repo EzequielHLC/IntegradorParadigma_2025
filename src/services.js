@@ -199,3 +199,37 @@ export const deleteUserAccountData = async (userId) => {
 
   await batch.commit();
 };
+
+// ------CHAT ----------
+import { onSnapshot, orderBy, serverTimestamp, limit } from 'firebase/firestore';
+
+          // Enviar mensaje
+export const sendGroupMessage = async (groupId, user, text) => {
+  if (!text.trim()) return;
+  
+  const messagesRef = collection(db, 'groups', groupId, 'messages');
+  await addDoc(messagesRef, {
+    text: text,
+    uid: user.uid,
+    displayName: user.displayName || user.email || "Usuario", // Fallback simple
+    createdAt: serverTimestamp()
+  });
+};
+
+// Escuchar mensajes
+export const subscribeToGroupMessages = (groupId, callback) => {
+  const messagesRef = collection(db, 'groups', groupId, 'messages');
+  const q = query(
+    messagesRef, 
+    orderBy('createdAt', 'asc'), 
+    limit(100)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(messages);
+  });
+};

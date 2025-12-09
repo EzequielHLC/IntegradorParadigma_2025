@@ -9,8 +9,9 @@ import {
 } from 'firebase/firestore';
 import { 
     LogOut, Plus, Users, Layout, MailWarning, Trash2, Home, CheckCircle, AlertTriangle, 
-    UserPlus, Search, X, Save, Tag, Hash, Calendar, Settings, AlertOctagon, RotateCcw
+    UserPlus, Search, X, Save, Tag, Hash, Calendar, Settings, AlertOctagon, RotateCcw, MessageCircle
 } from 'lucide-react';
+import { ChatRoom } from './components/chat/ChatRoom';
 
 /*
     App.jsx - Componente principal de la aplicación TaskFlow
@@ -54,6 +55,9 @@ export default function App() {
   
     // Estado Configuración
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    
+    // Estado Chat
+    const [showChat, setShowChat] = useState(false);
 
   // 1. Cargar Grupos del Usuario con AUTO-LIMPIEZA
   useEffect(() => {
@@ -403,6 +407,18 @@ export default function App() {
             {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
             {context !== 'personal' && (
                 <div className="flex gap-2">
+                    <button 
+                        onClick={() => setShowChat(!showChat)}
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border rounded-lg transition-colors ${
+                            showChat 
+                            ? 'bg-blue-100 text-blue-700 border-blue-200' 
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                        <MessageCircle className="w-4 h-4" />
+                        {showChat ? 'Ocultar Chat' : 'Chat'}
+                    </button>
+
                     {context.ownerId === user.uid ? (
                         <button 
                             onClick={handleDeleteGroup} 
@@ -428,6 +444,13 @@ export default function App() {
                 </div>
             )}
         </header>
+
+        {/* CHAT DEL GRUPO */}
+        {context !== 'personal' && showChat && (
+            <div className="mb-6 animate-in fade-in slide-in-from-top-2">
+                <ChatRoom groupId={context.id} />
+            </div>
+        )}
 
         {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
         {!showAddForm ? (
