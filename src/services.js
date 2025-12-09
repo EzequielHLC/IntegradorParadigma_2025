@@ -217,7 +217,7 @@ export const sendGroupMessage = async (groupId, user, text) => {
 };
 
 // Escuchar mensajes
-export const subscribeToGroupMessages = (groupId, callback) => {
+export const subscribeToGroupMessages = (groupId, callback, onError) => {
   const messagesRef = collection(db, 'groups', groupId, 'messages');
   const q = query(
     messagesRef, 
@@ -231,5 +231,8 @@ export const subscribeToGroupMessages = (groupId, callback) => {
       ...doc.data()
     }));
     callback(messages);
+  }, (error) => {
+    console.error("Error suscribiéndose al chat:", error);
+    if (onError) onError(error);
   });
 };
