@@ -326,133 +326,160 @@ export default function App() {
   if (!user) return <Auth />;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
       
-      {/* SIDEBAR */}
-      <aside className="w-full md:w-64 bg-white border-r border-gray-200 p-4 flex flex-col h-auto md:h-screen sticky top-0 z-10">
-        <div className="flex items-center gap-3 mb-8 px-2">
-            <div className="w-8 h-8 bg-black text-white rounded flex items-center justify-center"><Layout className="w-4 h-4"/></div>
-            <span className="font-bold tracking-tight">TaskFlow</span>
-        </div>
-
-        {/* User Info & Verification Block */}
-        <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600">
-                    {user.email?.includes('taskflow.local') ? user.email[0].toUpperCase() : user.email?.[0].toUpperCase()}
-                </div>
-                <div className="overflow-hidden">
-                    <p className="text-sm font-bold text-gray-900 truncate">
-                        {user.email?.includes('taskflow.local') ? user.email.split('@')[0] : user.email}
-                    </p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">
-                        {user.emailVerified ? 'Verificado' : 'No verificado'}
-                    </p>
-                </div>
+      {/* SIDEBAR PROFESIONAL */}
+      <aside className="w-full md:w-72 bg-slate-900 text-slate-300 flex flex-col h-auto md:h-screen sticky top-0 z-20 shadow-xl">
+        {/* Header Sidebar */}
+        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
+            <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
+                <Layout className="w-6 h-6"/>
             </div>
-
-            {/* Lógica de Email Opcional */}
-            {!user.emailVerified && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                    {user.email?.includes('taskflow.local') ? (
-                        editingEmail ? (
-                            <form onSubmit={handleAddEmail} className="space-y-2">
-                                <input 
-                                    type="email" 
-                                    placeholder="tu@email.com" 
-                                    className="w-full text-xs p-1.5 border rounded"
-                                    value={emailInput}
-                                    onChange={e => setEmailInput(e.target.value)}
-                                />
-                                <div className="flex gap-1">
-                                    <button type="submit" className="flex-1 bg-black text-white text-[10px] py-1 rounded">Guardar</button>
-                                    <button type="button" onClick={() => setEditingEmail(false)} className="px-2 bg-gray-200 text-[10px] rounded">X</button>
-                                </div>
-                            </form>
-                        ) : (
-                            <button onClick={() => setEditingEmail(true)} className="w-full text-left text-[11px] text-blue-600 hover:underline flex items-center gap-1">
-                                <UserPlus className="w-3 h-3" /> Agregar Email de contacto
-                            </button>
-                        )
-                    ) : (
-                        <div className="bg-amber-50 text-amber-700 p-2 rounded text-[10px] flex items-start gap-1.5">
-                            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                            <span>Falta verificar tu correo. Revisa tu bandeja de spam.</span>
-                        </div>
-                    )}
-                </div>
-            )}
-            
-            {user.emailVerified && (
-                <div className="mt-2 text-[10px] text-green-600 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Cuenta protegida
-                </div>
-            )}
-        </div>
-
-        <nav className="space-y-1 flex-1 overflow-y-auto">
-            <button onClick={() => setContext('personal')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context === 'personal' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <Home className="w-4 h-4" /> Personal
-            </button>
-            <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase px-3 flex justify-between items-center">
-                Grupos <button onClick={() => setShowGroupModal(true)} className="hover:text-black"><Plus className="w-3 h-3" /></button>
-            </div>
-            {userGroups.map(group => (
-                <button key={group.id} onClick={() => setContext(group)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context.id === group.id ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    <Users className="w-4 h-4" /> {group.name}
-                </button>
-            ))}
-                </nav>
-                <div className="mt-auto px-2 space-y-1">
-                         <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-black hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors">
-                                <Settings className="w-4 h-4" /> Configuración
-                        </button>
-            
-                        <button onClick={logout} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
-                                <LogOut className="w-4 h-4" /> Cerrar Sesión
-                        </button>
-                </div>
-            </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 p-4 md:p-8 max-w-3xl mx-auto w-full">
-        <header className="mb-8 flex justify-between items-start">
             <div>
-                <h1 className="text-2xl font-bold">{context === 'personal' ? 'Mis Tareas' : context.name}</h1>
-                <p className="text-gray-500 text-sm mt-1">
-                    {context === 'personal' ? 'Tu espacio privado' : (
-                        <span className="flex items-center gap-2">
-                            <span>ID: {context.id}</span>
-                            <span>•</span>
-                            <span>{context.completionMode === 'all' ? 'Todos deben completar' : 'Colaborativo'}</span>
-                        </span>
+                <h1 className="font-bold text-white text-lg tracking-tight">TaskFlow</h1>
+                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Workspace</p>
+            </div>
+        </div>
+
+        {/* User Profile Compact */}
+        <div className="px-4 py-6">
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-sm font-bold text-white shadow-md">
+                        {user.email?.includes('taskflow.local') ? user.email[0].toUpperCase() : user.email?.[0].toUpperCase()}
+                    </div>
+                    <div className="overflow-hidden">
+                        <p className="text-sm font-bold text-white truncate">
+                            {user.email?.includes('taskflow.local') ? user.email.split('@')[0] : user.email}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <div className={`w-2 h-2 rounded-full ${user.emailVerified ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
+                                {user.emailVerified ? 'Verificado' : 'Pendiente'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Email Verification Action */}
+                {!user.emailVerified && (
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                        {user.email?.includes('taskflow.local') ? (
+                            editingEmail ? (
+                                <form onSubmit={handleAddEmail} className="space-y-2">
+                                    <input 
+                                        type="email" 
+                                        placeholder="tu@email.com" 
+                                        className="w-full text-xs p-2 bg-slate-900 border border-slate-700 rounded text-white focus:border-blue-500 outline-none"
+                                        value={emailInput}
+                                        onChange={e => setEmailInput(e.target.value)}
+                                    />
+                                    <div className="flex gap-2">
+                                        <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] py-1.5 rounded font-medium transition-colors">Guardar</button>
+                                        <button type="button" onClick={() => setEditingEmail(false)} className="px-3 bg-slate-700 hover:bg-slate-600 text-white text-[10px] rounded transition-colors">✕</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <button onClick={() => setEditingEmail(true)} className="w-full text-left text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1.5 transition-colors">
+                                    <UserPlus className="w-3 h-3" /> Vincular correo real
+                                </button>
+                            )
+                        ) : (
+                            <div className="bg-amber-900/20 text-amber-200 p-2 rounded border border-amber-900/30 text-[10px] flex items-start gap-2">
+                                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                                <span>Verifica tu correo para asegurar tu cuenta.</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Principal</p>
+            <button onClick={() => setContext('personal')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${context === 'personal' ? 'bg-slate-800 text-white border border-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}>
+                <Home className={`w-5 h-5 ${context === 'personal' ? 'text-blue-400' : 'text-slate-500 group-hover:text-white'}`} /> 
+                Mis Tareas
+            </button>
+
+            <div className="pt-6 pb-2 px-4 flex justify-between items-center group">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Grupos de Trabajo</p>
+                <button onClick={() => setShowGroupModal(true)} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1 rounded transition-all" title="Crear o unirse a grupo">
+                    <Plus className="w-4 h-4" />
+                </button>
+            </div>
+            
+            <div className="space-y-1">
+                {userGroups.map(group => (
+                    <button key={group.id} onClick={() => setContext(group)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${context.id === group.id ? 'bg-slate-800 text-white border border-slate-700 shadow-sm' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}>
+                        <Users className={`w-5 h-5 ${context.id === group.id ? 'text-indigo-400' : 'text-slate-500 group-hover:text-white'}`} /> 
+                        <span className="truncate">{group.name}</span>
+                    </button>
+                ))}
+                {userGroups.length === 0 && (
+                    <div className="px-4 py-8 text-center border-2 border-dashed border-slate-800 rounded-xl mx-2">
+                        <p className="text-xs text-slate-600 mb-2">No tienes grupos</p>
+                        <button onClick={() => setShowGroupModal(true)} className="text-xs text-blue-400 hover:text-blue-300 font-medium">Crear uno ahora</button>
+                    </div>
+                )}
+            </div>
+        </nav>
+
+        {/* Footer Sidebar */}
+        <div className="p-4 mt-auto border-t border-slate-800 space-y-1">
+            <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 px-4 py-3 rounded-xl transition-colors">
+                <Settings className="w-5 h-5" /> Configuración
+            </button>
+            <button onClick={logout} className="w-full flex items-center gap-3 text-sm text-slate-400 hover:text-red-400 hover:bg-red-900/20 px-4 py-3 rounded-xl transition-colors">
+                <LogOut className="w-5 h-5" /> Cerrar Sesión
+            </button>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative">
+        {/* Top Bar */}
+        <header className="bg-white border-b border-slate-200 px-8 py-5 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                    {context === 'personal' ? (
+                        <>
+                            <span className="p-2 bg-blue-100 text-blue-700 rounded-lg"><Home className="w-6 h-6"/></span>
+                            Mis Tareas Personales
+                        </>
+                    ) : (
+                        <>
+                            <span className="p-2 bg-indigo-100 text-indigo-700 rounded-lg"><Users className="w-6 h-6"/></span>
+                            {context.name}
+                        </>
+                    )}
+                </h1>
+                <p className="text-slate-500 text-sm mt-1 ml-12 flex items-center gap-2">
+                    {context === 'personal' ? 'Gestiona tus pendientes privados' : (
+                        <>
+                            <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono text-slate-600">ID: {context.id}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="flex items-center gap-1 text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded">
+                                {context.completionMode === 'all' ? <CheckCircle className="w-3 h-3"/> : <Users className="w-3 h-3"/>}
+                                {context.completionMode === 'all' ? 'Modo Estricto' : 'Modo Colaborativo'}
+                            </span>
+                        </>
                     )}
                 </p>
             </div>
             
-            {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
+            {/* Group Actions */}
             {context !== 'personal' && (
-                <div className="flex gap-2">
-                   {/* <button 
-                        onClick={() => setShowChat(!showChat)}
-                        className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border rounded-lg transition-colors ${
-                            showChat 
-                            ? 'bg-blue-100 text-blue-700 border-blue-200' 
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                        }`}
-                    >
-                        <MessageCircle className="w-4 h-4" />
-                        {showChat ? 'Ocultar Chat' : 'Chat'}
-                    </button>*/}
-
+                <div className="flex items-center gap-3">
                     {context.ownerId === user.uid ? (
                         <button 
                             onClick={handleDeleteGroup} 
-                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                            className="btn-danger flex items-center gap-2 text-sm"
                             title="Eliminar grupo permanentemente"
                         >
                             <Trash2 className="w-4 h-4" />
-                            Eliminar Grupo
+                            <span className="hidden sm:inline">Eliminar Grupo</span>
                         </button>
                     ) : (
                         <button 
@@ -461,175 +488,249 @@ export default function App() {
                                     leaveGroup(user.uid, context.id).then(() => setContext('personal'));
                                 }
                             }} 
-                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors"
+                            className="btn-secondary flex items-center gap-2 text-sm"
                         >
-                            <LogOut className="w-3 h-3" />
-                            Abandonar
+                            <LogOut className="w-4 h-4" />
+                            <span className="hidden sm:inline">Abandonar</span>
                         </button>
                     )}
                 </div>
             )}
         </header>
 
-        {/* CHAT FLOTANTE - Estilo Facebook */}
-        {context !== 'personal' && showChat && (
-            <div className="fixed bottom-0 right-4 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
-                <ChatRoom 
-                    groupId={context.id} 
-                    onClose={() => setShowChat(false)} 
-                />
-            </div>
-        )}
-        
-        {/* BOTÓN FLOTANTE PARA ABRIR CHAT (Opcional, si quieres abrirlo desde abajo también) */}
-        {context !== 'personal' && !showChat && (
-            <button
-                onClick={() => {
-                    setShowChat(true);
-                    setHasUnreadMessages(prev => ({ ...prev, [context.id]: false }));
-                }}
-                className="fixed bottom-4 right-4 z-50 p-4 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center gap-2"
-            >
-                <MessageCircle size={24} />
-                <span className="font-medium pr-1">Chat</span>
-                {hasUnreadMessages[context.id] && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full shadow-md"></div>
-                )}
-            </button>
-        )}
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+            <div className="max-w-4xl mx-auto">
+                
+                {/* Add Task Button / Form */}
+                <div className="mb-8">
+                    {!showAddForm ? (
+                        <button onClick={() => setShowAddForm(true)} className="w-full py-4 border-2 border-dashed border-slate-300 rounded-2xl text-slate-500 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 transition-all duration-200 flex items-center justify-center gap-2 font-medium group">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                                <Plus className="w-5 h-5" />
+                            </div>
+                            <span>Crear Nueva Tarea</span>
+                        </button>
+                    ) : (
+                        <div className="card-modern animate-in fade-in slide-in-from-top-4 ring-4 ring-slate-50">
+                            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+                                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center"><Plus className="w-5 h-5"/></div>
+                                    Nueva Tarea
+                                </h3>
+                                <button onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+                            </div>
+                            
+                            <form onSubmit={handleSaveTask} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
+                                    <input required autoFocus className="input-modern text-lg font-medium" 
+                                        value={formTask.name} onChange={e => setFormTask({...formTask, name: e.target.value})} placeholder="Ej: Revisar reporte mensual" />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Detalles</label>
+                                    <textarea className="input-modern h-24 resize-none" 
+                                        value={formTask.details} onChange={e => setFormTask({...formTask, details: e.target.value})} placeholder="Añade notas, enlaces o sub-tareas..." />
+                                </div>
 
-        {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
-        {!showAddForm ? (
-            <button onClick={() => setShowAddForm(true)} className="w-full mb-6 py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 font-medium">
-                <Plus className="w-5 h-5" /> Nueva Tarea
-            </button>
-        ) : (
-            // --- FORMULARIO RESTAURADO ---
-            <div className="mb-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2">
-                <h3 className="font-bold mb-4 text-sm uppercase tracking-wide text-gray-500">Crear Tarea</h3>
-                <form onSubmit={handleSaveTask} className="space-y-4">
-                    {/* Nombre */}
-                    <input required autoFocus className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none" 
-                        value={formTask.name} onChange={e => setFormTask({...formTask, name: e.target.value})} placeholder="¿Qué hay que hacer?" />
-                    
-                    {/* Detalles */}
-                    <textarea className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm h-20 resize-none focus:bg-white focus:ring-2 focus:ring-black outline-none" 
-                        value={formTask.details} onChange={e => setFormTask({...formTask, details: e.target.value})} placeholder="Detalles adicionales..." />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700">Etiquetas</label>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 min-h-[80px]">
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {availableTags.map(tag => (
+                                                    <button key={tag} type="button" onClick={() => toggleFormTag(tag)} 
+                                                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${formTask.tags.includes(tag) ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                                                        {tag}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Hash className="w-4 h-4 text-slate-400" />
+                                                <input type="text" className="text-sm bg-transparent outline-none w-full placeholder:text-slate-400" placeholder="Crear nueva etiqueta..." 
+                                                    value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') handleAddNewTagInput(e); }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
 
-                    {/* Etiquetas */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-400"><Tag className="w-3 h-3" /> Etiquetas</div>
-                        <div className="flex flex-wrap gap-2">
-                            {availableTags.map(tag => (
-                                <button key={tag} type="button" onClick={() => toggleFormTag(tag)} className={`px-2 py-1 rounded-full text-xs border transition-colors ${formTask.tags.includes(tag) ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-200'}`}>{tag}</button>
-                            ))}
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700">Fecha de Vencimiento</label>
+                                        <div className="input-modern flex items-center gap-3">
+                                            <Calendar className="w-5 h-5 text-slate-400" />
+                                            <input type="datetime-local" className="bg-transparent w-full outline-none text-slate-800" value={formTask.dueDate} onChange={e => setFormTask({...formTask, dueDate: e.target.value})} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-slate-100">
+                                    <button type="button" onClick={() => setShowAddForm(false)} className="btn-secondary flex-1">Cancelar</button>
+                                    <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                                        <Save className="w-4 h-4" /> Guardar Tarea
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                        <div className="flex items-center gap-2 pt-1">
-                            <Hash className="w-3 h-3 text-gray-400" />
-                            <input type="text" className="text-xs bg-transparent outline-none w-full placeholder:text-gray-400" placeholder="Nueva etiqueta..." 
-                                value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') handleAddNewTagInput(e); }}
+                    )}
+                </div>
+
+                {/* Task List */}
+                <div className="space-y-4 pb-20">
+                    {tasks.map(task => (
+                        <TaskCard 
+                            key={task.id} 
+                            task={task} 
+                            context={context} 
+                            currentUserId={user.uid}
+                            onToggle={() => handleTaskToggle(task)}
+                            onDelete={() => handleDeleteTask(task.id)}
+                        />
+                    ))}
+                    
+                    {tasks.length === 0 && (
+                        <div className="text-center py-16 bg-white border-2 border-dashed border-slate-200 rounded-2xl">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle className="w-8 h-8 text-slate-300" />
+                            </div>
+                            <h3 className="text-lg font-medium text-slate-900">Todo listo por ahora</h3>
+                            <p className="text-slate-500 max-w-xs mx-auto mt-1">No tienes tareas pendientes en este espacio. ¡Disfruta tu tiempo libre!</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      </main>
+
+      {/* CHAT WIDGET */}
+      {context !== 'personal' && (
+        <>
+            {showChat && (
+                <div className="fixed bottom-0 right-6 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300 shadow-2xl rounded-t-xl overflow-hidden">
+                    <ChatRoom 
+                        groupId={context.id} 
+                        onClose={() => setShowChat(false)} 
+                    />
+                </div>
+            )}
+            
+            {!showChat && (
+                <button
+                    onClick={() => {
+                        setShowChat(true);
+                        setHasUnreadMessages(prev => ({ ...prev, [context.id]: false }));
+                    }}
+                    className="fixed bottom-6 right-6 z-50 p-4 bg-slate-900 text-white rounded-full shadow-xl hover:bg-slate-800 hover:scale-110 transition-all duration-200 flex items-center gap-2 group"
+                >
+                    <MessageCircle className="w-6 h-6" />
+                    <span className="font-bold pr-1 hidden group-hover:inline-block transition-all">Chat</span>
+                    {hasUnreadMessages[context.id] && (
+                        <span className="absolute top-0 right-0 flex h-4 w-4">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border-2 border-white"></span>
+                        </span>
+                    )}
+                </button>
+            )}
+        </>
+      )}
+
+      {/* MODAL GRUPOS */}
+      {showGroupModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-100">
+                <div className="text-center mb-6">
+                    <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">Gestión de Grupos</h3>
+                    <p className="text-slate-500 text-sm">Colabora con tu equipo en tiempo real</p>
+                </div>
+
+                <div className="flex gap-1 mb-6 bg-slate-100 p-1.5 rounded-xl">
+                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'create'})} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all shadow-sm ${groupFormData.mode === 'create' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}>Crear Nuevo</button>
+                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'join'})} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all shadow-sm ${groupFormData.mode === 'join' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700'}`}>Unirse a Existente</button>
+                </div>
+
+                <form onSubmit={handleGroupAction} className="space-y-4">
+                    {groupFormData.mode === 'create' && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Modo de Completado</label>
+                            <select className="input-modern" value={groupFormData.completionType} onChange={e => setGroupFormData({...groupFormData, completionType: e.target.value})}>
+                                <option value="single">Colaborativo (Cualquiera completa)</option>
+                                <option value="all">Estricto (Todos deben completar)</option>
+                            </select>
+                        </div>
+                    )}
+                    
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Nombre del Grupo</label>
+                        <div className="relative">
+                            <Users className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                            <input 
+                                required 
+                                placeholder="Ej: Proyecto Final" 
+                                className="input-modern pl-10" 
+                                value={groupFormData.name} 
+                                onChange={e => setGroupFormData({...groupFormData, name: e.target.value})} 
                             />
                         </div>
                     </div>
 
-                    {/* Fecha */}
-                    <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2">
-                        <Calendar className="w-4 h-4" />
-                        <input type="datetime-local" className="bg-transparent w-full outline-none text-gray-800" value={formTask.dueDate} onChange={e => setFormTask({...formTask, dueDate: e.target.value})} />
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Código de Acceso</label>
+                        <div className="relative">
+                            <Tag className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                            <input required placeholder="Contraseña secreta" type="password" className="input-modern pl-10" value={groupFormData.code} onChange={e => setGroupFormData({...groupFormData, code: e.target.value})} />
+                        </div>
                     </div>
-
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
-                        <button type="submit" className="flex-2 bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Tarea</button>
-                    </div>
-                </form>
-            </div>
-        )}
-
-        {/* LISTA DE TAREAS */}
-        <div className="space-y-2">
-            {tasks.map(task => (
-                <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    context={context} 
-                    currentUserId={user.uid}
-                    onToggle={() => handleTaskToggle(task)}
-                    onDelete={() => handleDeleteTask(task.id)}
-                />
-            ))}
-            {tasks.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">No hay tareas pendientes.</div>}
-        </div>
-      </main>
-
-      {/* MODAL GRUPOS (Mismo código anterior) */}
-      {showGroupModal && (
-        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-                <h3 className="text-lg font-bold mb-4">Gestión de Grupos</h3>
-                <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
-                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'create'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'create' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Crear</button>
-                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'join'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'join' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Unirse</button>
-                </div>
-                <form onSubmit={handleGroupAction} className="space-y-3">
-                    {groupFormData.mode === 'create' && (
-                        <select className="w-full p-2 border rounded text-sm bg-white" value={groupFormData.completionType} onChange={e => setGroupFormData({...groupFormData, completionType: e.target.value})}>
-                            <option value="single">Colaborativo (Cualquiera completa)</option>
-                            <option value="all">Estricto (Todos completan)</option>
-                        </select>
-                    )}
                     
-                    {/* CAMBIO AQUÍ: Eliminamos la condición ternaria en el placeholder */}
-                    <input 
-                        required 
-                        placeholder="Nombre del Grupo (Exacto)" 
-                        className="w-full p-2 border rounded text-sm" 
-                        value={groupFormData.name} 
-                        onChange={e => setGroupFormData({...groupFormData, name: e.target.value})} 
-                    />
-
-                    <input required placeholder="Contraseña de Acceso" type="password" className="w-full p-2 border rounded text-sm" value={groupFormData.code} onChange={e => setGroupFormData({...groupFormData, code: e.target.value})} />
-                    
-                    <div className="flex gap-2 mt-4">
-                        <button type="button" onClick={() => setShowGroupModal(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
-                        <button type="submit" className="flex-1 py-2 text-sm bg-black text-white rounded hover:bg-gray-800">Confirmar</button>
+                    <div className="flex gap-3 mt-6 pt-2">
+                        <button type="button" onClick={() => setShowGroupModal(false)} className="btn-secondary flex-1">Cancelar</button>
+                        <button type="submit" className="btn-primary flex-1">
+                            {groupFormData.mode === 'create' ? 'Crear Grupo' : 'Unirse al Grupo'}
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
       )}
+
       {/* MODAL CONFIGURACIÓN */}
       {showSettingsModal && (
-        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border border-gray-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                        <Settings className="w-5 h-5" /> Configuración
+                    <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900">
+                        <Settings className="w-5 h-5 text-slate-500" /> Configuración
                     </h3>
-                    <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-black"><X className="w-5 h-5"/></button>
+                    <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 p-2 rounded-full transition-colors"><X className="w-5 h-5"/></button>
                 </div>
 
                 <div className="space-y-4">
                     {/* Opción 1: Resetear Tareas */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                        <h4 className="font-bold text-sm text-gray-700 mb-1">Zona de Tareas</h4>
-                        <p className="text-xs text-gray-500 mb-3">Elimina todas las tareas de tu lista personal. Los grupos no se ven afectados.</p>
-                        <button onClick={handleResetTasks} className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-black py-2 rounded text-xs font-medium transition-all">
-                            <RotateCcw className="w-3.5 h-3.5" /> Reiniciar Mis Tareas
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                        <h4 className="font-bold text-sm text-slate-800 mb-1 flex items-center gap-2"><RotateCcw className="w-4 h-4 text-blue-500"/> Zona de Tareas</h4>
+                        <p className="text-xs text-slate-500 mb-4">Elimina todas las tareas de tu lista personal. Los grupos no se ven afectados.</p>
+                        <button onClick={handleResetTasks} className="w-full btn-secondary text-xs py-2">
+                            Reiniciar Mis Tareas
                         </button>
                     </div>
 
                     {/* Opción 2: Eliminar Cuenta */}
-                    <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                        <h4 className="font-bold text-sm text-red-700 mb-1">Zona de Peligro</h4>
-                        <p className="text-xs text-red-600/70 mb-3">Esta acción es irreversible. Se borrarán todos tus datos.</p>
-                        <button onClick={handleDeleteAccount} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-700 py-2 rounded text-xs font-medium transition-all shadow-sm">
-                            <AlertOctagon className="w-3.5 h-3.5" /> Eliminar Cuenta
+                    <div className="bg-red-50 p-5 rounded-xl border border-red-100">
+                        <h4 className="font-bold text-sm text-red-800 mb-1 flex items-center gap-2"><AlertOctagon className="w-4 h-4 text-red-500"/> Zona de Peligro</h4>
+                        <p className="text-xs text-red-600/80 mb-4">Esta acción es irreversible. Se borrarán todos tus datos y grupos.</p>
+                        <button onClick={handleDeleteAccount} className="w-full btn-danger bg-red-600 text-white border-transparent hover:bg-red-700 hover:border-transparent text-xs py-2 shadow-red-200 shadow-lg">
+                            Eliminar Cuenta Permanentemente
                         </button>
                     </div>
                 </div>
                 
-                <p className="text-center text-[10px] text-gray-300 mt-6">TaskFlow v1.0 • ID: {user.uid.slice(0,6)}</p>
+                <div className="mt-8 text-center">
+                    <p className="text-[10px] text-slate-400 font-mono">TaskFlow v2.0 • Build 2025</p>
+                    <p className="text-[10px] text-slate-300 mt-1">ID: {user.uid.slice(0,8)}...</p>
+                </div>
             </div>
         </div>
       )}
