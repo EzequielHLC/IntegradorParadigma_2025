@@ -48,7 +48,7 @@ export const MessageBubble = ({ message, isOwn }) => {
             {message.displayName}
           </span>
         )}
-        <p className="text-sm leading-relaxed break-words">{message.text}</p>
+        <p className="text-sm leading-relaxed wrap-break-word">{message.text}</p>
       </div>
     </div>
   );

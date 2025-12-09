@@ -27,48 +27,52 @@ export const TaskCard = ({ task, context, currentUserId, onToggle, onDelete }) =
   const isOverdue = dueDate && new Date() > dueDate && !isCompleted;
 
   return (
-    <div className={`group flex items-start p-4 bg-white border rounded-xl mb-3 transition-all shadow-sm ${isCompleted ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:border-black hover:shadow-md'}`}>
+    <div className={`group flex items-start p-5 rounded-xl mb-3 transition-all duration-200 border-2 ${isCompleted ? 'bg-slate-50 border-slate-100 opacity-75' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'}`}>
       
       {/* Botón Check */}
-      <button onClick={onToggle} className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors mr-3 ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-400 hover:border-black'}`}>
-        {isCompleted && <Check className="w-3.5 h-3.5" />}
+      <button 
+        onClick={onToggle} 
+        className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all mr-4 focus:ring-4 focus:ring-blue-100 ${isCompleted ? 'bg-green-500 border-green-500 text-white scale-90' : 'border-slate-300 hover:border-blue-500 text-transparent'}`}
+        aria-label={isCompleted ? "Marcar como pendiente" : "Marcar como completada"}
+      >
+        <Check className="w-4 h-4 stroke-[3]" />
       </button>
 
       <div className="flex-1 min-w-0">
         {/* Título */}
-        <h4 className={`text-sm font-medium leading-tight mb-1 ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+        <h4 className={`text-base font-medium leading-snug mb-1.5 ${isCompleted ? 'text-slate-400 line-through decoration-2' : 'text-slate-800'}`}>
           {task.name}
         </h4>
         
-        {/* Detalles (Descripción) restaurada */}
+        {/* Detalles */}
         {task.details && (
-          <p className={`text-xs mb-2 line-clamp-2 ${isCompleted ? 'text-gray-300' : 'text-gray-500'}`}>
+          <p className={`text-sm mb-3 line-clamp-2 ${isCompleted ? 'text-slate-300' : 'text-slate-500'}`}>
             {task.details}
           </p>
         )}
         
-        {/* Meta info: Tags, Fecha, Grupo */}
+        {/* Meta info */}
         <div className="flex flex-wrap gap-2 items-center">
             
             {/* Etiquetas */}
             {task.tags?.map(tag => (
-                <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded border uppercase tracking-wider ${isCompleted ? 'bg-transparent text-gray-300 border-gray-100' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                <span key={tag} className={`text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider ${isCompleted ? 'bg-transparent text-slate-300 border-slate-100' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                     {tag}
                 </span>
             ))}
             
             {/* Fecha de Vencimiento */}
             {dueDate && !isCompleted && (
-              <div className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium border ${isOverdue ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                  <Clock className="w-3 h-3" />
+              <div className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md font-medium border ${isOverdue ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                  <Clock className="w-3.5 h-3.5" />
                   <span>{dueDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' })}</span>
               </div>
             )}
 
-            {/* Indicador de Grupo (si aplica) */}
+            {/* Indicador de Grupo */}
             {context !== 'personal' && !isCompleted && (
-                <div className="flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                    <Users className="w-3 h-3" />
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
+                    <Users className="w-3.5 h-3.5" />
                     <span>{context.completionMode === 'all' ? completionText || 'Grupal' : 'Grupal'}</span>
                 </div>
             )}
@@ -76,8 +80,12 @@ export const TaskCard = ({ task, context, currentUserId, onToggle, onDelete }) =
       </div>
 
       {/* Botón Eliminar */}
-      <button onClick={onDelete} className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-        <Trash2 className="w-4 h-4" />
+      <button 
+        onClick={onDelete} 
+        className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+        title="Eliminar tarea"
+      >
+        <Trash2 className="w-5 h-5" />
       </button>
     </div>
   );
