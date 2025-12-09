@@ -9,8 +9,9 @@ import {
 } from 'firebase/firestore';
 import { 
     LogOut, Plus, Users, Layout, MailWarning, Trash2, Home, CheckCircle, AlertTriangle, 
-    UserPlus, Search, X, Save, Tag, Hash, Calendar, Settings, AlertOctagon, RotateCcw
+    UserPlus, Search, X, Save, Tag, Hash, Calendar, Settings, AlertOctagon, RotateCcw, MessageCircle
 } from 'lucide-react';
+import { ChatRoom } from './components/chat/ChatRoom';
 
 /*
     App.jsx - Componente principal de la aplicación TaskFlow
@@ -54,6 +55,9 @@ export default function App() {
   
     // Estado Configuración
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    
+    // Estado Chat
+    const [showChat, setShowChat] = useState(false);
 
   // 1. Cargar Grupos del Usuario con AUTO-LIMPIEZA
   useEffect(() => {
@@ -403,6 +407,18 @@ export default function App() {
             {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
             {context !== 'personal' && (
                 <div className="flex gap-2">
+                   {/* <button 
+                        onClick={() => setShowChat(!showChat)}
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border rounded-lg transition-colors ${
+                            showChat 
+                            ? 'bg-blue-100 text-blue-700 border-blue-200' 
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        }`}
+                    >
+                        <MessageCircle className="w-4 h-4" />
+                        {showChat ? 'Ocultar Chat' : 'Chat'}
+                    </button>*/}
+
                     {context.ownerId === user.uid ? (
                         <button 
                             onClick={handleDeleteGroup} 
@@ -428,6 +444,27 @@ export default function App() {
                 </div>
             )}
         </header>
+
+        {/* CHAT FLOTANTE - Estilo Facebook */}
+        {context !== 'personal' && showChat && (
+            <div className="fixed bottom-0 right-4 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
+                <ChatRoom 
+                    groupId={context.id} 
+                    onClose={() => setShowChat(false)} 
+                />
+            </div>
+        )}
+        
+        {/* BOTÓN FLOTANTE PARA ABRIR CHAT (Opcional, si quieres abrirlo desde abajo también) */}
+        {context !== 'personal' && !showChat && (
+            <button
+                onClick={() => setShowChat(true)}
+                className="fixed bottom-4 right-4 z-50 p-4 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center gap-2"
+            >
+                <MessageCircle size={24} />
+                <span className="font-medium pr-1">Chat</span>
+            </button>
+        )}
 
         {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
         {!showAddForm ? (
@@ -471,7 +508,7 @@ export default function App() {
 
                     <div className="flex gap-2 pt-2">
                         <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
-                        <button type="submit" className="flex-[2] bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Tarea</button>
+                        <button type="submit" className="flex-2 bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Tarea</button>
                     </div>
                 </form>
             </div>
