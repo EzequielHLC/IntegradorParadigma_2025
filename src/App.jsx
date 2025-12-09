@@ -407,7 +407,7 @@ export default function App() {
             {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
             {context !== 'personal' && (
                 <div className="flex gap-2">
-                    <button 
+                   {/* <button 
                         onClick={() => setShowChat(!showChat)}
                         className={`flex items-center gap-2 px-3 py-2 text-xs font-medium border rounded-lg transition-colors ${
                             showChat 
@@ -417,7 +417,7 @@ export default function App() {
                     >
                         <MessageCircle className="w-4 h-4" />
                         {showChat ? 'Ocultar Chat' : 'Chat'}
-                    </button>
+                    </button>*/}
 
                     {context.ownerId === user.uid ? (
                         <button 
@@ -445,11 +445,25 @@ export default function App() {
             )}
         </header>
 
-        {/* CHAT DEL GRUPO */}
+        {/* CHAT FLOTANTE - Estilo Facebook */}
         {context !== 'personal' && showChat && (
-            <div className="mb-6 animate-in fade-in slide-in-from-top-2">
-                <ChatRoom groupId={context.id} />
+            <div className="fixed bottom-0 right-4 z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
+                <ChatRoom 
+                    groupId={context.id} 
+                    onClose={() => setShowChat(false)} 
+                />
             </div>
+        )}
+        
+        {/* BOTÓN FLOTANTE PARA ABRIR CHAT (Opcional, si quieres abrirlo desde abajo también) */}
+        {context !== 'personal' && !showChat && (
+            <button
+                onClick={() => setShowChat(true)}
+                className="fixed bottom-4 right-4 z-50 p-4 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center gap-2"
+            >
+                <MessageCircle size={24} />
+                <span className="font-medium pr-1">Chat</span>
+            </button>
         )}
 
         {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
