@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 import Auth from './components/Auth';
 import { TaskCard } from './components/TaskCard';
-import { createGroup, joinGroup, leaveGroup, deleteGroup, toggleTaskCompletion, resetPersonalTasks, deleteUserAccountData } from './services';
+import { createGroup, joinGroup, leaveGroup, deleteGroup, toggleTaskCompletion, resetPersonalTasks, deleteUserAccountData, subscribeToGroupMessages } from './services';
 import { db } from './firebase';
 import { 
     collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, getDoc, updateDoc, arrayUnion, arrayRemove 
@@ -58,6 +58,7 @@ export default function App() {
     
     // Estado Chat
     const [showChat, setShowChat] = useState(false);
+    const [hasUnreadMessages, setHasUnreadMessages] = useState({});
 
   // 1. Cargar Grupos del Usuario con AUTO-LIMPIEZA
   useEffect(() => {
@@ -112,6 +113,31 @@ export default function App() {
     });
     return () => unsubUser();
   }, [user]);
+
+  // Escuchar nuevos mensajes solo cuando el chat está CERRADO
+    useEffect(() => {
+        if (!user || context === 'personal' || showChat) return;
+
+        let firstSnapshot = true;
+  
+        const unsubscribe = subscribeToGroupMessages(context.id, (updatedMessages) => {
+        // La primera vez que se ejecuta el callback, ignoramos los mensajes existentes
+        if (firstSnapshot) {
+            firstSnapshot = false;
+            return;
+        }
+        
+        // A partir de aquí, cualquier nuevo mensaje marca como no leído
+        if (updatedMessages.length > 0) {
+            setHasUnreadMessages(prev => ({
+                ...prev,
+                [context.id]: true
+            }));
+        }
+    });
+
+        return () => unsubscribe();
+    }, [context, showChat, user]);
 
   // 2. Cargar Tareas según Contexto
   useEffect(() => {
@@ -458,11 +484,17 @@ export default function App() {
         {/* BOTÓN FLOTANTE PARA ABRIR CHAT (Opcional, si quieres abrirlo desde abajo también) */}
         {context !== 'personal' && !showChat && (
             <button
-                onClick={() => setShowChat(true)}
+                onClick={() => {
+                    setShowChat(true);
+                    setHasUnreadMessages(prev => ({ ...prev, [context.id]: false }));
+                }}
                 className="fixed bottom-4 right-4 z-50 p-4 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 hover:scale-105 transition-all duration-200 flex items-center gap-2"
             >
                 <MessageCircle size={24} />
                 <span className="font-medium pr-1">Chat</span>
+                {hasUnreadMessages[context.id] && (
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full shadow-md"></div>
+                )}
             </button>
         )}
 
