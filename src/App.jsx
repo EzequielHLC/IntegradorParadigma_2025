@@ -4,11 +4,11 @@ import Auth from './components/Auth';
 import { TaskCard } from './components/TaskCard';
 import { createGroup, joinGroup, leaveGroup, deleteGroup, toggleTaskCompletion, resetPersonalTasks, deleteUserAccountData } from './services';
 import { db } from './firebase';
-import { 
-    collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, getDoc, updateDoc, arrayUnion, arrayRemove 
+import {
+    collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, getDoc, updateDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
-import { 
-    LogOut, Plus, Users, Layout, MailWarning, Trash2, Home, CheckCircle, AlertTriangle, 
+import {
+    LogOut, Plus, Users, Layout, MailWarning, Trash2, Home, CheckCircle, AlertTriangle,
     UserPlus, Search, X, Save, Tag, Hash, Calendar, Settings, AlertOctagon, RotateCcw
 } from 'lucide-react';
 
@@ -28,246 +28,309 @@ const DEFAULT_TAGS = ['Trabajo', 'Personal', 'Urgente', 'Idea', 'Hogar'];
 
 export default function App() {
     const { user, logout, linkRealEmail, verifyEmail, deleteAuthUser } = useAuth();
-  
-  // Estado Global
-  const [context, setContext] = useState('personal'); 
-  const [tasks, setTasks] = useState([]);
-  const [userGroups, setUserGroups] = useState([]);
-  const [userProfile, setUserProfile] = useState(null); // Para tags personalizados guardados
 
-  // Estados UI
-  const [showGroupModal, setShowGroupModal] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  
-  // Estado Formulario Tarea (RECUPERADO)
-  const [formTask, setFormTask] = useState({
-    name: '', details: '', dueDate: '', tags: []
-  });
-  const [newTagInput, setNewTagInput] = useState('');
+    // Estado Global
+    const [context, setContext] = useState('personal');
+    const [tasks, setTasks] = useState([]);
+    const [editingTaskId, setEditingTaskId] = useState(null);
+    const [userGroups, setUserGroups] = useState([]);
+    const [userProfile, setUserProfile] = useState(null); // Para tags personalizados guardados
 
-  // Estado Formulario Grupo
-  const [groupFormData, setGroupFormData] = useState({ name: '', code: '', mode: 'create', completionType: 'single' });
-  
-  // Estado Email
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-  
+    // Estados UI
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [showAddForm, setShowAddForm] = useState(false);
+
+    // Estado Formulario Tarea (RECUPERADO)
+    const [formTask, setFormTask] = useState({
+        name: '', details: '', dueDate: '', tags: []
+    });
+
+    // Estado auxiliar para la carga de etiquetas personalizadas en tiempo real
+    // No se persiste hasta que se guarda la tarea
+    const [newTagInput, setNewTagInput] = useState('');
+
+    // Estado Formulario Grupo
+    const [groupFormData, setGroupFormData] = useState({ name: '', code: '', mode: 'create', completionType: 'single' });
+
+    // Estado Email
+    const [editingEmail, setEditingEmail] = useState(false);
+    const [emailInput, setEmailInput] = useState('');
+
     // Estado Configuración
     const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  // 1. Cargar Grupos del Usuario con AUTO-LIMPIEZA
-  useEffect(() => {
-    if (!user) return;
-    
-    // Escuchamos cambios en el documento del usuario
-    const unsubUser = onSnapshot(doc(db, 'users', user.uid), async (userDoc) => {
-        if (userDoc.exists()) {
-            const userData = userDoc.data();
-            // Actualizamos el perfil local (para tags, username, etc)
-            setUserProfile(userData);
+    // 1. Cargar Grupos del Usuario con AUTO-LIMPIEZA
+    useEffect(() => {
+        if (!user) return;
 
-            const groupIds = userData.groups || [];
-            
-            if (groupIds.length > 0) {
-                // Obtenemos los documentos de todos los grupos referenciados
-                const groupDocs = await Promise.all(groupIds.map(gid => getDoc(doc(db, 'groups', gid))));
-                
-                const validGroups = [];
-                const invalidIds = [];
+        // Escuchamos cambios en el documento del usuario
+        const unsubUser = onSnapshot(doc(db, 'users', user.uid), async (userDoc) => {
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                // Actualizamos el perfil local (para tags, username, etc)
+                setUserProfile(userData);
 
-                // Clasificamos entre grupos vivos y grupos fantasma
-                groupDocs.forEach(gDoc => {
-                    if (gDoc.exists()) {
-                        validGroups.push({ id: gDoc.id, ...gDoc.data() });
-                    } else {
-                        // Si el documento no existe, guardamos el ID para borrarlo
-                        invalidIds.push(gDoc.id);
+                const groupIds = userData.groups || [];
+
+                if (groupIds.length > 0) {
+                    // Obtenemos los documentos de todos los grupos referenciados
+                    const groupDocs = await Promise.all(groupIds.map(gid => getDoc(doc(db, 'groups', gid))));
+
+                    const validGroups = [];
+                    const invalidIds = [];
+
+                    // Clasificamos entre grupos vivos y grupos fantasma
+                    groupDocs.forEach(gDoc => {
+                        if (gDoc.exists()) {
+                            validGroups.push({ id: gDoc.id, ...gDoc.data() });
+                        } else {
+                            // Si el documento no existe, guardamos el ID para borrarlo
+                            invalidIds.push(gDoc.id);
+                        }
+                    });
+
+                    setUserGroups(validGroups);
+
+                    // --- LÓGICA DE AUTO-REPARACIÓN ---
+                    // Si detectamos IDs de grupos que ya no existen, los borramos del usuario
+                    if (invalidIds.length > 0) {
+                        // Si detectamos IDs de grupos que ya no existen, intentar eliminarlos
+                        // del array `groups` del usuario para evitar entradas fantasma.
+                        try {
+                            await updateDoc(doc(db, 'users', user.uid), {
+                                groups: arrayRemove(...invalidIds)
+                            });
+                        } catch (err) {
+                            // Registrar error de manera clara para diagnóstico.
+                            console.error("Error auto-limpiando grupos:", err);
+                        }
                     }
-                });
-
-                setUserGroups(validGroups);
-
-                // --- LÓGICA DE AUTO-REPARACIÓN ---
-                // Si detectamos IDs de grupos que ya no existen, los borramos del usuario
-                if (invalidIds.length > 0) {
-                    // Si detectamos IDs de grupos que ya no existen, intentar eliminarlos
-                    // del array `groups` del usuario para evitar entradas fantasma.
-                    try {
-                        await updateDoc(doc(db, 'users', user.uid), {
-                            groups: arrayRemove(...invalidIds)
-                        });
-                    } catch (err) {
-                        // Registrar error de manera clara para diagnóstico.
-                        console.error("Error auto-limpiando grupos:", err);
-                    }
+                } else {
+                    setUserGroups([]);
                 }
-            } else {
-                setUserGroups([]);
             }
-        }
-    });
-    return () => unsubUser();
-  }, [user]);
-
-  // 2. Cargar Tareas según Contexto
-  useEffect(() => {
-    if (!user) return;
-    const collectionPath = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
-    const q = query(collection(db, collectionPath), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snapshot) => {
-        setTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
-  }, [user, context]);
-
-  // --- LÓGICA DE ETIQUETAS ---
-  const availableTags = useMemo(() => {
-    const custom = userProfile?.customTags || [];
-    const groupTags = context !== 'personal' ? (context.customTags || []) : [];
-    // Unimos tags por defecto + tags del usuario + tags del grupo actual
-    return Array.from(new Set([...DEFAULT_TAGS, ...custom, ...groupTags]));
-  }, [userProfile, context]);
-
-  const toggleFormTag = (tag) => {
-    setFormTask(prev => ({
-      ...prev,
-      tags: prev.tags.includes(tag) ? prev.tags.filter(t => t !== tag) : [...prev.tags, tag]
-    }));
-  };
-
-  const handleAddNewTagInput = (e) => {
-    e.preventDefault();
-    const tag = newTagInput.trim();
-    if(tag && !formTask.tags.includes(tag)) {
-        setFormTask(prev => ({ ...prev, tags: [...prev.tags, tag] }));
-        setNewTagInput('');
-    }
-  };
-
-  // --- CREAR TAREA (FULL) ---
-  const handleSaveTask = async (e) => {
-    e.preventDefault();
-    if (!formTask.name.trim()) return;
-
-    try {
-        const collectionPath = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
-        
-        // 1. Guardar nuevos tags en el perfil si es personal
-        const existingTags = new Set(availableTags);
-        const newTagsToSave = formTask.tags.filter(t => !existingTags.has(t));
-        
-        if (newTagsToSave.length > 0 && context === 'personal') {
-            await updateDoc(doc(db, 'users', user.uid), { customTags: arrayUnion(...newTagsToSave) });
-        }
-
-        // 2. Guardar Tarea Completa
-        await addDoc(collection(db, collectionPath), {
-            name: formTask.name,
-            details: formTask.details,
-            dueDate: formTask.dueDate || null,
-            tags: formTask.tags,
-            completed: false,
-            completedBy: [],
-            createdAt: new Date().toISOString()
         });
+        return () => unsubUser();
+    }, [user]);
 
-        setFormTask({ name: '', details: '', dueDate: '', tags: [] });
-        setShowAddForm(false);
-    } catch (err) {
-        console.error(err);
-        alert("Error al crear tarea");
-    }
-  };
+    // 2. Cargar Tareas según Contexto
+    useEffect(() => {
+        if (!user) return;
+        const collectionPath = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
+        const q = query(collection(db, collectionPath), orderBy('createdAt', 'desc'));
+        const unsub = onSnapshot(q, (snapshot) => {
+            setTasks(
+                snapshot.docs.map(d => ({
+                    id: d.id,
+                    ...d.data(),
+                    tags: d.data().tags || []
+                }))
+            );
 
-  // --- ACCIONES TAREA ---
-  const handleTaskToggle = async (task) => {
-    const path = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
-    const mode = context === 'personal' ? 'single' : context.completionMode;
-    // Extraemos la colección base de la ruta
-    const collectionRef = path.split('/tasks')[0] + '/tasks';
-    await toggleTaskCompletion(collectionRef, task.id, user.uid, task, mode);
-  };
+        });
+        return () => unsub();
+    }, [user, context]);
 
-  const handleDeleteTask = async (taskId) => {
-    if(window.confirm('¿Eliminar tarea?')) {
-        const path = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
-        await deleteDoc(doc(db, path, taskId));
-    }
-  };
+    // --- LÓGICA DE ETIQUETAS 
+    // - Combina etiquetas por defecto + etiquetas del grupo
+    // - Evita duplicados con normalización case-insensitive
+    // - Permite alternar (agregar/quitar) etiquetas en el formulario
+    const availableTags = useMemo(() => {
+        const groupTags = context !== 'personal' ? (context.customTags || []) : [];
+        return Array.from(new Set([...DEFAULT_TAGS, ...groupTags]));
+    }, [context]);
 
-  // --- OTRAS ACCIONES (Grupos / Email) ---
-  const handleGroupAction = async (e) => { 
-    e.preventDefault();
-    try {
-        if (groupFormData.mode === 'create') await createGroup(user.uid, groupFormData.name, groupFormData.code, groupFormData.completionType);
-        else await joinGroup(user.uid, groupFormData.name, groupFormData.code);
-        setShowGroupModal(false); setGroupFormData({ name: '', code: '', mode: 'create', completionType: 'single' });
-    } catch (err) { alert(err.message); }
-  };
+    const normalizeTag = (tag) => tag.trim().toLowerCase();
 
-  const handleAddEmail = async (e) => { /* ... Lógica existente ... */
-    e.preventDefault();
-    if(!emailInput.includes('@')) return alert("Email inválido");
-    try {
-        await linkRealEmail(emailInput);
-        setEditingEmail(false);
-        alert(`Enlace enviado a ${emailInput}.`);
-    } catch (error) { alert(error.message); }
-  };
+    const toggleFormTag = (tag) => {
+        const normalized = normalizeTag(tag);
+        // Alterna una etiqueta en el formulario de creación/edición
+        // Si ya existe (ignorando mayúsculas/minúsculas) la elimina
+        setFormTask(prev => {
+            const exists = prev.tags.some(t => normalizeTag(t) === normalized);
 
-  const handleDeleteGroup = async () => {
-    if (!context || context === 'personal') return;
-    
-    const confirmMessage = `¿Estás seguro de que quieres eliminar el grupo "${context.name}"?\n\nEsta acción no se puede deshacer y eliminará el acceso para todos los miembros.`;
-    
-    if (window.confirm(confirmMessage)) {
-        try {
-            await deleteGroup(context.id);
-            setContext('personal'); // Volver a inicio
-            alert("Grupo eliminado correctamente.");
-        } catch (error) {
-            console.error(error);
-            alert("Error al eliminar el grupo: " + error.message);
+            return {
+                ...prev,
+                tags: exists
+                    ? prev.tags.filter(t => normalizeTag(t) !== normalized)
+                    : [...prev.tags, tag]
+            };
+        });
+    };
+
+    // Maneja la carga de nuevas etiquetas personalizadas
+    // - Valida longitud máxima (30 caracteres)
+    // - Evita duplicados (case insensitive)
+    // - Limpia el input luego de agregar
+    const handleAddNewTagInput = (e) => {
+        e.preventDefault();
+
+        const raw = newTagInput.trim();
+        const normalized = normalizeTag(raw);
+
+        if (!raw) return;
+
+        if (raw.length > 30) {
+            alert("La etiqueta no puede superar los 30 caracteres.");
+            return;
         }
-    }
-  };
 
-  const handleResetTasks = async () => {
-    const confirmMsg = "ADVERTENCIA: ¿Estás seguro de que quieres borrar TODAS tus tareas personales?\n\nEsta acción no se puede deshacer.";
-    if (window.confirm(confirmMsg)) {
-        try {
-            await resetPersonalTasks(user.uid);
-            alert("Tareas eliminadas correctamente.");
-            setShowSettingsModal(false);
-        } catch (error) {
-            console.error(error);
-            alert("Error: " + error.message);
+        const exists = formTask.tags.some(t => normalizeTag(t) === normalized);
+        if (exists) {
+            alert("Esta etiqueta ya fue añadida.");
+            return;
         }
-    }
-  };
 
-  const handleDeleteAccount = async () => {
-    const confirmMsg = "PELIGRO CRÍTICO: \n\n¿Estás seguro de que quieres eliminar tu cuenta PERMANENTEMENTE?\n\n- Se borrarán tus tareas.\n- Se eliminarán los grupos que creaste.\n- Se perderá tu acceso.\n\nEscribe 'ELIMINAR' para confirmar.";
-    
-    const input = window.prompt(confirmMsg);
-    
-    if (input === 'ELIMINAR') {
+        setFormTask(prev => ({
+            ...prev,
+            tags: [...prev.tags, raw]
+        }));
+
+        setNewTagInput('');
+    };
+
+    // Guardado de tarea (creación y edición)
+    // Incluye persistencia de etiquetas predefinidas y personalizadas
+    const handleSaveTask = async (e) => {
+        e.preventDefault();
+        if (!formTask.name.trim()) return;
+
         try {
-            // 1. Limpiar datos en Firestore
-            await deleteUserAccountData(user.uid);
-            // 2. Borrar usuario de Auth
-            await deleteAuthUser(); 
-            // El usuario será redirigido al login automáticamente por el AuthContext
-        } catch (error) {
-            console.error(error);
-            if (error.code === 'auth/requires-recent-login') {
-                alert("Por seguridad, debes cerrar sesión y volver a entrar antes de eliminar tu cuenta.");
+            const collectionPath = context === 'personal'
+                ? `users/${user.uid}/tasks`
+                : `groups/${context.id}/tasks`;
+
+            const payload = {
+                name: formTask.name.trim(),
+                details: formTask.details?.trim() || '',
+                dueDate: formTask.dueDate || null,
+                tags: formTask.tags.map(t => t.trim()), // Se normalizan espacios pero se respeta el formato visual del usuario
+                createdAt: new Date().toISOString()
+            };
+
+
+            if (editingTaskId) {
+                await updateDoc(doc(db, collectionPath, editingTaskId), payload);
             } else {
-                alert("Error al eliminar cuenta: " + error.message);
+                await addDoc(collection(db, collectionPath), {
+                    ...payload,
+                    completed: false,
+                    completedBy: []
+                });
+            }
+
+            setFormTask({ name: '', details: '', dueDate: '', tags: [] });
+            setEditingTaskId(null);
+            setShowAddForm(false);
+        } catch (err) {
+            console.error(err);
+            alert("Error al guardar tarea");
+        }
+    };
+
+    // Carga completa de la tarea en el formulario para su edición
+    // Incluye recuperación de etiquetas ya persistidas
+    const handleEditTask = (task) => {
+        setFormTask({
+            name: task.name,
+            details: task.details || '',
+            dueDate: task.dueDate || '',
+            tags: task.tags || []
+        });
+        setEditingTaskId(task.id);
+        setShowAddForm(true);
+    };
+
+
+    // --- ACCIONES TAREA ---
+    const handleTaskToggle = async (task) => {
+        const path = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
+        const mode = context === 'personal' ? 'single' : context.completionMode;
+        // Extraemos la colección base de la ruta
+        const collectionRef = path.split('/tasks')[0] + '/tasks';
+        await toggleTaskCompletion(collectionRef, task.id, user.uid, task, mode);
+    };
+
+    const handleDeleteTask = async (taskId) => {
+        if (window.confirm('¿Eliminar tarea?')) {
+            const path = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
+            await deleteDoc(doc(db, path, taskId));
+        }
+    };
+
+    // --- OTRAS ACCIONES (Grupos / Email) ---
+    const handleGroupAction = async (e) => {
+        e.preventDefault();
+        try {
+            if (groupFormData.mode === 'create') await createGroup(user.uid, groupFormData.name, groupFormData.code, groupFormData.completionType);
+            else await joinGroup(user.uid, groupFormData.name, groupFormData.code);
+            setShowGroupModal(false); setGroupFormData({ name: '', code: '', mode: 'create', completionType: 'single' });
+        } catch (err) { alert(err.message); }
+    };
+
+    const handleAddEmail = async (e) => { /* ... Lógica existente ... */
+        e.preventDefault();
+        if (!emailInput.includes('@')) return alert("Email inválido");
+        try {
+            await linkRealEmail(emailInput);
+            setEditingEmail(false);
+            alert(`Enlace enviado a ${emailInput}.`);
+        } catch (error) { alert(error.message); }
+    };
+
+    const handleDeleteGroup = async () => {
+        if (!context || context === 'personal') return;
+
+        const confirmMessage = `¿Estás seguro de que quieres eliminar el grupo "${context.name}"?\n\nEsta acción no se puede deshacer y eliminará el acceso para todos los miembros.`;
+
+        if (window.confirm(confirmMessage)) {
+            try {
+                await deleteGroup(context.id);
+                setContext('personal'); // Volver a inicio
+                alert("Grupo eliminado correctamente.");
+            } catch (error) {
+                console.error(error);
+                alert("Error al eliminar el grupo: " + error.message);
             }
         }
-    }
-  };
+    };
+
+    const handleResetTasks = async () => {
+        const confirmMsg = "ADVERTENCIA: ¿Estás seguro de que quieres borrar TODAS tus tareas personales?\n\nEsta acción no se puede deshacer.";
+        if (window.confirm(confirmMsg)) {
+            try {
+                await resetPersonalTasks(user.uid);
+                alert("Tareas eliminadas correctamente.");
+                setShowSettingsModal(false);
+            } catch (error) {
+                console.error(error);
+                alert("Error: " + error.message);
+            }
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        const confirmMsg = "PELIGRO CRÍTICO: \n\n¿Estás seguro de que quieres eliminar tu cuenta PERMANENTEMENTE?\n\n- Se borrarán tus tareas.\n- Se eliminarán los grupos que creaste.\n- Se perderá tu acceso.\n\nEscribe 'ELIMINAR' para confirmar.";
+
+        const input = window.prompt(confirmMsg);
+
+        if (input === 'ELIMINAR') {
+            try {
+                // 1. Limpiar datos en Firestore
+                await deleteUserAccountData(user.uid);
+                // 2. Borrar usuario de Auth
+                await deleteAuthUser();
+                // El usuario será redirigido al login automáticamente por el AuthContext
+            } catch (error) {
+                console.error(error);
+                if (error.code === 'auth/requires-recent-login') {
+                    alert("Por seguridad, debes cerrar sesión y volver a entrar antes de eliminar tu cuenta.");
+                } else {
+                    alert("Error al eliminar cuenta: " + error.message);
+                }
+            }
+        }
+    };
 
     // --- NUEVO: MONITOR DE INTEGRIDAD DEL GRUPO ACTUAL ---
     // Si estoy en un grupo y alguien (el admin) lo borra, este efecto me detecta
@@ -277,293 +340,344 @@ export default function App() {
 
         // Escuchamos el documento del grupo actual en tiempo real
         const unsubGroup = onSnapshot(doc(db, 'groups', context.id), (docSnapshot) => {
-                // Si el snapshot indica que NO existe, es que fue borrado
-                if (!docSnapshot.exists()) {
-                        alert(`El grupo "${context.name}" ha sido eliminado por el administrador.`);
-                        setContext('personal'); // Expulsión inmediata
-            
-                        // Opcional: Limpiar localmente la lista para evitar clickear de nuevo
-                        setUserGroups(prev => prev.filter(g => g.id !== context.id));
-                } else {
-                        // Si el grupo se actualizó (ej. cambiaron el nombre), actualizamos el contexto
-                        setContext(prev => ({ ...prev, ...docSnapshot.data() }));
-                }
+            // Si el snapshot indica que NO existe, es que fue borrado
+            if (!docSnapshot.exists()) {
+                alert(`El grupo "${context.name}" ha sido eliminado por el administrador.`);
+                setContext('personal'); // Expulsión inmediata
+
+                // Opcional: Limpiar localmente la lista para evitar clickear de nuevo
+                setUserGroups(prev => prev.filter(g => g.id !== context.id));
+            } else {
+                // Si el grupo se actualizó (ej. cambiaron el nombre), actualizamos el contexto
+                setContext(prev => ({ ...prev, ...docSnapshot.data() }));
+            }
         });
 
         return () => unsubGroup();
     }, [context.id]); // Solo se reinicia si cambio de grupo manualmente
 
-  if (!user) return <Auth />;
+    if (!user) return <Auth />;
 
-  return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col md:flex-row">
-      
-      {/* SIDEBAR */}
-      <aside className="w-full md:w-64 bg-white border-r border-gray-200 p-4 flex flex-col h-auto md:h-screen sticky top-0 z-10">
-        <div className="flex items-center gap-3 mb-8 px-2">
-            <div className="w-8 h-8 bg-black text-white rounded flex items-center justify-center"><Layout className="w-4 h-4"/></div>
-            <span className="font-bold tracking-tight">TaskFlow</span>
-        </div>
+    return (
+        <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col md:flex-row">
 
-        {/* User Info & Verification Block */}
-        <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600">
-                    {user.email?.includes('taskflow.local') ? user.email[0].toUpperCase() : user.email?.[0].toUpperCase()}
+            {/* SIDEBAR */}
+            <aside className="w-full md:w-64 bg-white border-r border-gray-200 p-4 flex flex-col h-auto md:h-screen sticky top-0 z-10">
+                <div className="flex items-center gap-3 mb-8 px-2">
+                    <div className="w-8 h-8 bg-black text-white rounded flex items-center justify-center"><Layout className="w-4 h-4" /></div>
+                    <span className="font-bold tracking-tight">TaskFlow</span>
                 </div>
-                <div className="overflow-hidden">
-                    <p className="text-sm font-bold text-gray-900 truncate">
-                        {user.email?.includes('taskflow.local') ? user.email.split('@')[0] : user.email}
-                    </p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">
-                        {user.emailVerified ? 'Verificado' : 'No verificado'}
-                    </p>
-                </div>
-            </div>
 
-            {/* Lógica de Email Opcional */}
-            {!user.emailVerified && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                    {user.email?.includes('taskflow.local') ? (
-                        editingEmail ? (
-                            <form onSubmit={handleAddEmail} className="space-y-2">
-                                <input 
-                                    type="email" 
-                                    placeholder="tu@email.com" 
-                                    className="w-full text-xs p-1.5 border rounded"
-                                    value={emailInput}
-                                    onChange={e => setEmailInput(e.target.value)}
-                                />
-                                <div className="flex gap-1">
-                                    <button type="submit" className="flex-1 bg-black text-white text-[10px] py-1 rounded">Guardar</button>
-                                    <button type="button" onClick={() => setEditingEmail(false)} className="px-2 bg-gray-200 text-[10px] rounded">X</button>
+                {/* User Info & Verification Block */}
+                <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600">
+                            {user.email?.includes('taskflow.local') ? user.email[0].toUpperCase() : user.email?.[0].toUpperCase()}
+                        </div>
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-bold text-gray-900 truncate">
+                                {user.email?.includes('taskflow.local') ? user.email.split('@')[0] : user.email}
+                            </p>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+                                {user.emailVerified ? 'Verificado' : 'No verificado'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Lógica de Email Opcional */}
+                    {!user.emailVerified && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                            {user.email?.includes('taskflow.local') ? (
+                                editingEmail ? (
+                                    <form onSubmit={handleAddEmail} className="space-y-2">
+                                        <input
+                                            type="email"
+                                            placeholder="tu@email.com"
+                                            className="w-full text-xs p-1.5 border rounded"
+                                            value={emailInput}
+                                            onChange={e => setEmailInput(e.target.value)}
+                                        />
+                                        <div className="flex gap-1">
+                                            <button type="submit" className="flex-1 bg-black text-white text-[10px] py-1 rounded">Guardar</button>
+                                            <button type="button" onClick={() => setEditingEmail(false)} className="px-2 bg-gray-200 text-[10px] rounded">X</button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <button onClick={() => setEditingEmail(true)} className="w-full text-left text-[11px] text-blue-600 hover:underline flex items-center gap-1">
+                                        <UserPlus className="w-3 h-3" /> Agregar Email de contacto
+                                    </button>
+                                )
+                            ) : (
+                                <div className="bg-amber-50 text-amber-700 p-2 rounded text-[10px] flex items-start gap-1.5">
+                                    <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                                    <span>Falta verificar tu correo. Revisa tu bandeja de spam.</span>
                                 </div>
-                            </form>
-                        ) : (
-                            <button onClick={() => setEditingEmail(true)} className="w-full text-left text-[11px] text-blue-600 hover:underline flex items-center gap-1">
-                                <UserPlus className="w-3 h-3" /> Agregar Email de contacto
-                            </button>
-                        )
-                    ) : (
-                        <div className="bg-amber-50 text-amber-700 p-2 rounded text-[10px] flex items-start gap-1.5">
-                            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                            <span>Falta verificar tu correo. Revisa tu bandeja de spam.</span>
+                            )}
+                        </div>
+                    )}
+
+                    {user.emailVerified && (
+                        <div className="mt-2 text-[10px] text-green-600 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Cuenta protegida
                         </div>
                     )}
                 </div>
-            )}
-            
-            {user.emailVerified && (
-                <div className="mt-2 text-[10px] text-green-600 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Cuenta protegida
-                </div>
-            )}
-        </div>
 
-        <nav className="space-y-1 flex-1 overflow-y-auto">
-            <button onClick={() => setContext('personal')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context === 'personal' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                <Home className="w-4 h-4" /> Personal
-            </button>
-            <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase px-3 flex justify-between items-center">
-                Grupos <button onClick={() => setShowGroupModal(true)} className="hover:text-black"><Plus className="w-3 h-3" /></button>
-            </div>
-            {userGroups.map(group => (
-                <button key={group.id} onClick={() => setContext(group)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context.id === group.id ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    <Users className="w-4 h-4" /> {group.name}
-                </button>
-            ))}
+                <nav className="space-y-1 flex-1 overflow-y-auto">
+                    <button onClick={() => setContext('personal')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context === 'personal' ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                        <Home className="w-4 h-4" /> Personal
+                    </button>
+                    <div className="pt-4 pb-2 text-xs font-bold text-gray-400 uppercase px-3 flex justify-between items-center">
+                        Grupos <button onClick={() => setShowGroupModal(true)} className="hover:text-black"><Plus className="w-3 h-3" /></button>
+                    </div>
+                    {userGroups.map(group => (
+                        <button key={group.id} onClick={() => setContext(group)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${context.id === group.id ? 'bg-black text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                            <Users className="w-4 h-4" /> {group.name}
+                        </button>
+                    ))}
                 </nav>
                 <div className="mt-auto px-2 space-y-1">
-                         <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-black hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors">
-                                <Settings className="w-4 h-4" /> Configuración
-                        </button>
-            
-                        <button onClick={logout} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
-                                <LogOut className="w-4 h-4" /> Cerrar Sesión
-                        </button>
+                    <button onClick={() => setShowSettingsModal(true)} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-black hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors">
+                        <Settings className="w-4 h-4" /> Configuración
+                    </button>
+
+                    <button onClick={logout} className="w-full flex items-center gap-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
+                        <LogOut className="w-4 h-4" /> Cerrar Sesión
+                    </button>
                 </div>
             </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 p-4 md:p-8 max-w-3xl mx-auto w-full">
-        <header className="mb-8 flex justify-between items-start">
-            <div>
-                <h1 className="text-2xl font-bold">{context === 'personal' ? 'Mis Tareas' : context.name}</h1>
-                <p className="text-gray-500 text-sm mt-1">
-                    {context === 'personal' ? 'Tu espacio privado' : (
-                        <span className="flex items-center gap-2">
-                            <span>ID: {context.id}</span>
-                            <span>•</span>
-                            <span>{context.completionMode === 'all' ? 'Todos deben completar' : 'Colaborativo'}</span>
-                        </span>
+            {/* MAIN CONTENT */}
+            <main className="flex-1 p-4 md:p-8 max-w-3xl mx-auto w-full">
+                <header className="mb-8 flex justify-between items-start">
+                    <div>
+                        <h1 className="text-2xl font-bold">{context === 'personal' ? 'Mis Tareas' : context.name}</h1>
+                        <p className="text-gray-500 text-sm mt-1">
+                            {context === 'personal' ? 'Tu espacio privado' : (
+                                <span className="flex items-center gap-2">
+                                    <span>ID: {context.id}</span>
+                                    <span>•</span>
+                                    <span>{context.completionMode === 'all' ? 'Todos deben completar' : 'Colaborativo'}</span>
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
+                    {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
+                    {context !== 'personal' && (
+                        <div className="flex gap-2">
+                            {context.ownerId === user.uid ? (
+                                <button
+                                    onClick={handleDeleteGroup}
+                                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                                    title="Eliminar grupo permanentemente"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    Eliminar Grupo
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('¿Salir del grupo?')) {
+                                            leaveGroup(user.uid, context.id).then(() => setContext('personal'));
+                                        }
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors"
+                                >
+                                    <LogOut className="w-3 h-3" />
+                                    Abandonar
+                                </button>
+                            )}
+                        </div>
                     )}
-                </p>
-            </div>
-            
-            {/* LÓGICA DE BOTONES DE ADMINISTRACIÓN DE GRUPO */}
-            {context !== 'personal' && (
-                <div className="flex gap-2">
-                    {context.ownerId === user.uid ? (
-                        <button 
-                            onClick={handleDeleteGroup} 
-                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
-                            title="Eliminar grupo permanentemente"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Eliminar Grupo
-                        </button>
-                    ) : (
-                        <button 
-                            onClick={() => { 
-                                if(window.confirm('¿Salir del grupo?')) {
-                                    leaveGroup(user.uid, context.id).then(() => setContext('personal'));
-                                }
-                            }} 
-                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg transition-colors"
-                        >
-                            <LogOut className="w-3 h-3" />
-                            Abandonar
-                        </button>
-                    )}
+                </header>
+
+                {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
+                {!showAddForm ? (
+                    <button onClick={() => setShowAddForm(true)} className="w-full mb-6 py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 font-medium">
+                        <Plus className="w-5 h-5" /> Nueva Tarea
+                    </button>
+                ) : (
+                    // --- FORMULARIO RESTAURADO ---
+                    <div className="mb-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2">
+                        {/* Título dinámico según modo: creación vs edición */}
+                        <h3 className="font-bold mb-4 text-sm uppercase tracking-wide text-gray-500">{editingTaskId ? 'Edición de Tarea' : 'Crear Tarea'}</h3>
+                        <form onSubmit={handleSaveTask} className="space-y-4">
+                            {/* Nombre */}
+                            <input required autoFocus className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none"
+                                value={formTask.name} onChange={e => setFormTask({ ...formTask, name: e.target.value })} placeholder="¿Qué hay que hacer?" />
+
+                            {/* Detalles */}
+                            <textarea className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm h-20 resize-none focus:bg-white focus:ring-2 focus:ring-black outline-none"
+                                value={formTask.details} onChange={e => setFormTask({ ...formTask, details: e.target.value })} placeholder="Detalles adicionales..." />
+
+                            {/* Etiquetas */}
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-400"><Tag className="w-3 h-3" /> Etiquetas</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {/* Etiquetas predefinidas */}
+                                    {availableTags.map(tag => {
+                                        const active = formTask.tags.some(t => t.toLowerCase() === tag.toLowerCase());
+
+                                        return (
+                                            <button
+                                                key={tag}
+                                                type="button"
+                                                onClick={() => toggleFormTag(tag)}
+                                                className={`px-2 py-0.5 rounded text-xs border transition
+        ${active ? 'bg-black text-white border-black'
+                                                        : 'bg-white text-gray-600 border-gray-300'}`}
+                                            >
+                                                {tag}
+                                            </button>
+                                        );
+                                    })}
+
+                                    {/* Etiquetas personalizadas ya cargadas */}
+                                    {formTask.tags
+                                        .filter(tag => !availableTags.some(t => t.toLowerCase() === tag.toLowerCase()))
+                                        .map(tag => (
+                                            <span
+                                                key={tag}
+                                                className="px-2 py-0.5 rounded text-xs bg-gray-200 text-gray-700 border flex items-center gap-1"
+                                            >
+                                                {tag}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleFormTag(tag)}
+                                                    className="text-red-500 hover:text-red-700 text-xs"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </span>
+                                        ))}
+
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        className="text-xs bg-transparent outline-none flex-1 placeholder:text-gray-400"
+                                        placeholder="Nueva etiqueta..."
+                                        value={newTagInput}
+                                        onChange={(e) => setNewTagInput(e.target.value)}
+                                    />
+                                    {/* Botón explícito para agregar etiqueta */}
+                                    <button
+                                        type="button"
+                                        onClick={handleAddNewTagInput}
+                                        className="px-2 py-0.5 text-xs bg-black text-white rounded hover:bg-gray-800 transition"
+                                    >
+                                        Agregar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Fecha */}
+                            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                <Calendar className="w-4 h-4" />
+                                <input type="datetime-local" className="bg-transparent w-full outline-none text-gray-800" value={formTask.dueDate} onChange={e => setFormTask({ ...formTask, dueDate: e.target.value })} />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                                <button type="submit" className="flex-[2] bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Tarea</button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {/* LISTA DE TAREAS BLOQUEABLE
+                - Se deshabilita la interacción mientras el formulario está abierto
+                - Previene ediciones simultáneas y estados inconsistentes
+                */}
+                <div className={`space-y-2 transition-opacity ${showAddForm ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+                    {tasks.map(task => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            context={context}
+                            currentUserId={user.uid}
+                            onToggle={() => handleTaskToggle(task)}
+                            onDelete={() => handleDeleteTask(task.id)}
+                            onEdit={() => handleEditTask(task)}
+                        />
+
+                    ))}
+                    {tasks.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">No hay tareas pendientes.</div>}
+                </div>
+            </main>
+
+            {/* MODAL GRUPOS (Mismo código anterior) */}
+            {showGroupModal && (
+                <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+                        <h3 className="text-lg font-bold mb-4">Gestión de Grupos</h3>
+                        <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
+                            <button onClick={() => setGroupFormData({ ...groupFormData, mode: 'create' })} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'create' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Crear</button>
+                            <button onClick={() => setGroupFormData({ ...groupFormData, mode: 'join' })} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'join' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Unirse</button>
+                        </div>
+                        <form onSubmit={handleGroupAction} className="space-y-3">
+                            {groupFormData.mode === 'create' && (
+                                <select className="w-full p-2 border rounded text-sm bg-white" value={groupFormData.completionType} onChange={e => setGroupFormData({ ...groupFormData, completionType: e.target.value })}>
+                                    <option value="single">Colaborativo (Cualquiera completa)</option>
+                                    <option value="all">Estricto (Todos completan)</option>
+                                </select>
+                            )}
+
+                            {/* CAMBIO AQUÍ: Eliminamos la condición ternaria en el placeholder */}
+                            <input
+                                required
+                                placeholder="Nombre del Grupo (Exacto)"
+                                className="w-full p-2 border rounded text-sm"
+                                value={groupFormData.name}
+                                onChange={e => setGroupFormData({ ...groupFormData, name: e.target.value })}
+                            />
+
+                            <input required placeholder="Contraseña de Acceso" type="password" className="w-full p-2 border rounded text-sm" value={groupFormData.code} onChange={e => setGroupFormData({ ...groupFormData, code: e.target.value })} />
+
+                            <div className="flex gap-2 mt-4">
+                                <button type="button" onClick={() => setShowGroupModal(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
+                                <button type="submit" className="flex-1 py-2 text-sm bg-black text-white rounded hover:bg-gray-800">Confirmar</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
-        </header>
-
-        {/* BOTÓN NUEVA TAREA (Abre formulario completo) */}
-        {!showAddForm ? (
-            <button onClick={() => setShowAddForm(true)} className="w-full mb-6 py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-black hover:text-black transition-colors flex items-center justify-center gap-2 font-medium">
-                <Plus className="w-5 h-5" /> Nueva Tarea
-            </button>
-        ) : (
-            // --- FORMULARIO RESTAURADO ---
-            <div className="mb-8 bg-white border border-gray-200 rounded-xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2">
-                <h3 className="font-bold mb-4 text-sm uppercase tracking-wide text-gray-500">Crear Tarea</h3>
-                <form onSubmit={handleSaveTask} className="space-y-4">
-                    {/* Nombre */}
-                    <input required autoFocus className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none" 
-                        value={formTask.name} onChange={e => setFormTask({...formTask, name: e.target.value})} placeholder="¿Qué hay que hacer?" />
-                    
-                    {/* Detalles */}
-                    <textarea className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm h-20 resize-none focus:bg-white focus:ring-2 focus:ring-black outline-none" 
-                        value={formTask.details} onChange={e => setFormTask({...formTask, details: e.target.value})} placeholder="Detalles adicionales..." />
-
-                    {/* Etiquetas */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-400"><Tag className="w-3 h-3" /> Etiquetas</div>
-                        <div className="flex flex-wrap gap-2">
-                            {availableTags.map(tag => (
-                                <button key={tag} type="button" onClick={() => toggleFormTag(tag)} className={`px-2 py-1 rounded-full text-xs border transition-colors ${formTask.tags.includes(tag) ? 'bg-black text-white border-black' : 'bg-white text-gray-600 border-gray-200'}`}>{tag}</button>
-                            ))}
+            {/* MODAL CONFIGURACIÓN */}
+            {showSettingsModal && (
+                <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border border-gray-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <Settings className="w-5 h-5" /> Configuración
+                            </h3>
+                            <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-black"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="flex items-center gap-2 pt-1">
-                            <Hash className="w-3 h-3 text-gray-400" />
-                            <input type="text" className="text-xs bg-transparent outline-none w-full placeholder:text-gray-400" placeholder="Nueva etiqueta..." 
-                                value={newTagInput} onChange={(e) => setNewTagInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter') handleAddNewTagInput(e); }}
-                            />
+
+                        <div className="space-y-4">
+                            {/* Opción 1: Resetear Tareas */}
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                <h4 className="font-bold text-sm text-gray-700 mb-1">Zona de Tareas</h4>
+                                <p className="text-xs text-gray-500 mb-3">Elimina todas las tareas de tu lista personal. Los grupos no se ven afectados.</p>
+                                <button onClick={handleResetTasks} className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-black py-2 rounded text-xs font-medium transition-all">
+                                    <RotateCcw className="w-3.5 h-3.5" /> Reiniciar Mis Tareas
+                                </button>
+                            </div>
+
+                            {/* Opción 2: Eliminar Cuenta */}
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                                <h4 className="font-bold text-sm text-red-700 mb-1">Zona de Peligro</h4>
+                                <p className="text-xs text-red-600/70 mb-3">Esta acción es irreversible. Se borrarán todos tus datos.</p>
+                                <button onClick={handleDeleteAccount} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-700 py-2 rounded text-xs font-medium transition-all shadow-sm">
+                                    <AlertOctagon className="w-3.5 h-3.5" /> Eliminar Cuenta
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Fecha */}
-                    <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2">
-                        <Calendar className="w-4 h-4" />
-                        <input type="datetime-local" className="bg-transparent w-full outline-none text-gray-800" value={formTask.dueDate} onChange={e => setFormTask({...formTask, dueDate: e.target.value})} />
-                    </div>
-
-                    <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>
-                        <button type="submit" className="flex-[2] bg-black text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Tarea</button>
-                    </div>
-                </form>
-            </div>
-        )}
-
-        {/* LISTA DE TAREAS */}
-        <div className="space-y-2">
-            {tasks.map(task => (
-                <TaskCard 
-                    key={task.id} 
-                    task={task} 
-                    context={context} 
-                    currentUserId={user.uid}
-                    onToggle={() => handleTaskToggle(task)}
-                    onDelete={() => handleDeleteTask(task.id)}
-                />
-            ))}
-            {tasks.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">No hay tareas pendientes.</div>}
-        </div>
-      </main>
-
-      {/* MODAL GRUPOS (Mismo código anterior) */}
-      {showGroupModal && (
-        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-                <h3 className="text-lg font-bold mb-4">Gestión de Grupos</h3>
-                <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
-                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'create'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'create' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Crear</button>
-                    <button onClick={() => setGroupFormData({...groupFormData, mode: 'join'})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${groupFormData.mode === 'join' ? 'bg-white shadow-sm text-black' : 'text-gray-500'}`}>Unirse</button>
-                </div>
-                <form onSubmit={handleGroupAction} className="space-y-3">
-                    {groupFormData.mode === 'create' && (
-                        <select className="w-full p-2 border rounded text-sm bg-white" value={groupFormData.completionType} onChange={e => setGroupFormData({...groupFormData, completionType: e.target.value})}>
-                            <option value="single">Colaborativo (Cualquiera completa)</option>
-                            <option value="all">Estricto (Todos completan)</option>
-                        </select>
-                    )}
-                    
-                    {/* CAMBIO AQUÍ: Eliminamos la condición ternaria en el placeholder */}
-                    <input 
-                        required 
-                        placeholder="Nombre del Grupo (Exacto)" 
-                        className="w-full p-2 border rounded text-sm" 
-                        value={groupFormData.name} 
-                        onChange={e => setGroupFormData({...groupFormData, name: e.target.value})} 
-                    />
-
-                    <input required placeholder="Contraseña de Acceso" type="password" className="w-full p-2 border rounded text-sm" value={groupFormData.code} onChange={e => setGroupFormData({...groupFormData, code: e.target.value})} />
-                    
-                    <div className="flex gap-2 mt-4">
-                        <button type="button" onClick={() => setShowGroupModal(false)} className="flex-1 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded">Cancelar</button>
-                        <button type="submit" className="flex-1 py-2 text-sm bg-black text-white rounded hover:bg-gray-800">Confirmar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-      )}
-      {/* MODAL CONFIGURACIÓN */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm border border-gray-100">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold flex items-center gap-2">
-                        <Settings className="w-5 h-5" /> Configuración
-                    </h3>
-                    <button onClick={() => setShowSettingsModal(false)} className="text-gray-400 hover:text-black"><X className="w-5 h-5"/></button>
-                </div>
-
-                <div className="space-y-4">
-                    {/* Opción 1: Resetear Tareas */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                        <h4 className="font-bold text-sm text-gray-700 mb-1">Zona de Tareas</h4>
-                        <p className="text-xs text-gray-500 mb-3">Elimina todas las tareas de tu lista personal. Los grupos no se ven afectados.</p>
-                        <button onClick={handleResetTasks} className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-black py-2 rounded text-xs font-medium transition-all">
-                            <RotateCcw className="w-3.5 h-3.5" /> Reiniciar Mis Tareas
-                        </button>
-                    </div>
-
-                    {/* Opción 2: Eliminar Cuenta */}
-                    <div className="bg-red-50 p-4 rounded-lg border border-red-100">
-                        <h4 className="font-bold text-sm text-red-700 mb-1">Zona de Peligro</h4>
-                        <p className="text-xs text-red-600/70 mb-3">Esta acción es irreversible. Se borrarán todos tus datos.</p>
-                        <button onClick={handleDeleteAccount} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-700 py-2 rounded text-xs font-medium transition-all shadow-sm">
-                            <AlertOctagon className="w-3.5 h-3.5" /> Eliminar Cuenta
-                        </button>
+                        <p className="text-center text-[10px] text-gray-300 mt-6">TaskFlow v1.0 • ID: {user.uid.slice(0, 6)}</p>
                     </div>
                 </div>
-                
-                <p className="text-center text-[10px] text-gray-300 mt-6">TaskFlow v1.0 • ID: {user.uid.slice(0,6)}</p>
-            </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 }
