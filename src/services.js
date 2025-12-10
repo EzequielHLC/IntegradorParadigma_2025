@@ -109,6 +109,25 @@ export const joinGroup = async (userId, groupName, inputCode) => {
 };
 
 export const leaveGroup = async (userId, groupId) => {
+  // Obtener nombre del usuario ANTES de borrarlo para la notificación
+  let rawName = 'Usuario';
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      const ud = userSnap.data();
+      rawName = ud.username || ud.email || rawName;
+    }
+  } catch (err) {
+    console.error('Error obteniendo nombre de usuario para notificación:', err);
+  }
+
+  // Normalizar para quitar dominio si viene en formato email
+  const shortName = (typeof rawName === 'string' && rawName.includes('@'))
+    ? rawName.split('@')[0]
+    : rawName;
+
+  // Ejecutar la salida del grupo
   const batch = writeBatch(db);
   const groupRef = doc(db, 'groups', groupId);
   const userRef = doc(db, 'users', userId);
@@ -117,6 +136,20 @@ export const leaveGroup = async (userId, groupId) => {
   batch.update(userRef, { groups: arrayRemove(groupId) });
   
   await batch.commit();
+
+  // Crear mensaje de sistema tras confirmar la salida
+  try {
+    const messagesRef = collection(db, 'groups', groupId, 'messages');
+    await addDoc(messagesRef, {
+      text: `${shortName} ha abandonado el grupo.`,
+      uid: 'system',
+      displayName: 'Sistema',
+      system: true,
+      createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error('Error creando notificación de abandono:', err);
+  }
 };
 
 export const deleteGroup = async (groupId) => {
