@@ -1,8 +1,8 @@
 import { db } from './firebase';
-import { 
-  collection, doc, addDoc, getDoc, updateDoc, deleteDoc, 
+import {
+  collection, doc, addDoc, getDoc, updateDoc, deleteDoc,
   arrayUnion, arrayRemove, runTransaction, writeBatch,
-  query, where, getDocs 
+  query, where, getDocs
 } from 'firebase/firestore';
 
 /*
@@ -30,12 +30,12 @@ export const createGroup = async (userId, groupName, accessCode, completionMode)
     name: groupName,
     accessCode: accessCode,
     ownerId: userId,
-    completionMode: completionMode || 'single', 
+    completionMode: completionMode || 'single',
     members: [userId],
     customTags: ['Grupo', 'Urgente'],
     createdAt: new Date().toISOString()
   });
-  
+
   // 3. VINCULACIÓN: Agregar referencia al creador
   await updateDoc(doc(db, 'users', userId), {
     groups: arrayUnion(groupRef.id)
@@ -65,7 +65,7 @@ export const joinGroup = async (userId, groupName, inputCode) => {
   if (groupData.members?.includes(userId)) {
     throw new Error("Ya eres miembro de este grupo.");
   }
-  
+
   // 3. UNIÓN ATÓMICA
   const groupRef = doc(db, 'groups', groupId);
   const userRef = doc(db, 'users', userId);
@@ -79,15 +79,54 @@ export const joinGroup = async (userId, groupName, inputCode) => {
 };
 
 export const leaveGroup = async (userId, groupId) => {
-  const batch = writeBatch(db);
   const groupRef = doc(db, 'groups', groupId);
   const userRef = doc(db, 'users', userId);
+  const tasksRef = collection(db, 'groups', groupId, 'tasks');
 
+  const batch = writeBatch(db);
+
+  const groupSnap = await getDoc(groupRef);
+  const groupData = groupSnap.data();
+
+  // Sacar del grupo
   batch.update(groupRef, { members: arrayRemove(userId) });
   batch.update(userRef, { groups: arrayRemove(groupId) });
-  
+
+  // Procesar todas las tareas
+  const tasksSnap = await getDocs(tasksRef);
+
+  tasksSnap.forEach(taskDoc => {
+    const taskData = taskDoc.data();
+    const taskRef = taskDoc.ref;
+
+    // SI EL GRUPO ES COLABORATIVO Y LA TAREA FUE CREADA POR EL USUARIO → SE BORRA
+    if (
+      groupData.completionMode === 'single' && // colaborativo
+      taskData.createdBy === userId
+    ) {
+      batch.delete(taskRef);
+      return;
+    }
+
+
+    // SI NO, SOLO SE DESASIGNA Y SE REMUEVE DE COMPLETADOS
+    if (taskData.assignedTo?.includes(userId)) {
+      batch.update(taskRef, {
+        assignedTo: taskData.assignedTo.filter(uid => uid !== userId)
+      });
+    }
+
+    if (taskData.completedBy?.includes(userId)) {
+      batch.update(taskRef, {
+        completedBy: taskData.completedBy.filter(uid => uid !== userId)
+      });
+    }
+  });
+
   await batch.commit();
 };
+
+
 
 export const deleteGroup = async (groupId) => {
   // 1. Obtener datos del grupo ANTES de borrarlo para tener la lista de miembros
@@ -106,14 +145,14 @@ export const deleteGroup = async (groupId) => {
   // detectará el cambio en su perfil y quitará el grupo de la barra lateral automáticamente.
   members.forEach(memberId => {
     const userRef = doc(db, 'users', memberId);
-    batch.update(userRef, { 
-        groups: arrayRemove(groupId) 
+    batch.update(userRef, {
+      groups: arrayRemove(groupId)
     });
   });
 
   // 3. Finalmente, borrar el grupo
   batch.delete(groupRef);
-  
+
   // 4. Ejecutar todo junto
   await batch.commit();
 };
@@ -122,7 +161,7 @@ export const deleteGroup = async (groupId) => {
 
 export const toggleTaskCompletion = async (path, taskId, userId, currentStatus, completionMode) => {
   const taskRef = doc(db, path, taskId);
-  
+
   if (completionMode === 'all') {
     if (currentStatus.completedBy?.includes(userId)) {
       await updateDoc(taskRef, { completedBy: arrayRemove(userId) });
@@ -131,9 +170,9 @@ export const toggleTaskCompletion = async (path, taskId, userId, currentStatus, 
     }
   } else {
     const newStatus = !currentStatus.completed;
-    await updateDoc(taskRef, { 
+    await updateDoc(taskRef, {
       completed: newStatus,
-      completedBy: newStatus ? arrayUnion(userId) : [], 
+      completedBy: newStatus ? arrayUnion(userId) : [],
       completedAt: newStatus ? new Date().toISOString() : null
     });
   }
@@ -145,7 +184,7 @@ export const toggleTaskCompletion = async (path, taskId, userId, currentStatus, 
 export const resetPersonalTasks = async (userId) => {
   const tasksRef = collection(db, `users/${userId}/tasks`);
   const snapshot = await getDocs(tasksRef);
-  
+
   if (snapshot.empty) return;
 
   const batch = writeBatch(db);
@@ -161,7 +200,7 @@ export const deleteUserAccountData = async (userId) => {
   // A. Obtener datos del usuario para ver sus grupos
   const userRef = doc(db, 'users', userId);
   const userSnap = await getDoc(userRef);
-  
+
   if (!userSnap.exists()) return;
 
   const userData = userSnap.data();
@@ -174,15 +213,15 @@ export const deleteUserAccountData = async (userId) => {
   for (const groupId of groupIds) {
     const groupRef = doc(db, 'groups', groupId);
     const groupSnap = await getDoc(groupRef);
-    
+
     if (groupSnap.exists()) {
       const groupData = groupSnap.data();
-      
+
       if (groupData.ownerId === userId) {
         // OPCIÓN 1: Si es el DUEÑO, borramos el grupo entero (más limpio)
         // Nota: Esto deja referencias huérfanas en otros usuarios, 
         // pero el sistema de "Auto-Limpieza" en App.jsx lo arregla.
-        batch.delete(groupRef); 
+        batch.delete(groupRef);
       } else {
         // OPCIÓN 2: Si es MIEMBRO, solo lo sacamos de la lista
         batch.update(groupRef, { members: arrayRemove(userId) });
@@ -199,3 +238,74 @@ export const deleteUserAccountData = async (userId) => {
 
   await batch.commit();
 };
+
+//FUNCIONES DE ASIGNACIÓN DE USUARIOS A TAREAS
+// Asignar usuario a tarea de grupo
+export const assignUserToTask = async (groupId, taskId, targetUserId, requesterId) => {
+  const taskRef = doc(db, "groups", groupId, "tasks", taskId);
+  const groupRef = doc(db, "groups", groupId);
+
+  const taskSnap = await getDoc(taskRef);
+  const groupSnap = await getDoc(groupRef);
+
+  if (!taskSnap.exists() || !groupSnap.exists()) return;
+
+  const task = taskSnap.data();
+  const group = groupSnap.data();
+
+  //  BLOQUEO TOTAL EN GRUPOS ESTRICTOS
+  if (group.completionMode === 'all') {
+    throw new Error("En grupos estrictos no se permite asignar usuarios.");
+  }
+
+  if (task.createdBy !== requesterId) {
+    throw new Error("Solo el creador puede asignar usuarios.");
+  }
+
+  if (!group.members.includes(targetUserId)) {
+    throw new Error("El usuario no pertenece al grupo.");
+  }
+
+  const updatedAssigned = task.assignedTo || [];
+
+  if (!updatedAssigned.includes(targetUserId)) {
+    updatedAssigned.push(targetUserId);
+  }
+
+  await updateDoc(taskRef, {
+    assignedTo: updatedAssigned
+  });
+};
+
+
+// Desasignar usuario
+export const unassignUserFromTask = async (groupId, taskId, targetUserId, requesterId) => {
+  const taskRef = doc(db, "groups", groupId, "tasks", taskId);
+  const groupRef = doc(db, "groups", groupId);
+
+  const taskSnap = await getDoc(taskRef);
+  const groupSnap = await getDoc(groupRef);
+
+  if (!taskSnap.exists() || !groupSnap.exists()) return;
+
+  const task = taskSnap.data();
+  const group = groupSnap.data();
+
+  // BLOQUEO TOTAL EN GRUPOS ESTRICTOS
+  if (group.completionMode === 'all') {
+    throw new Error("En grupos estrictos no se permite desasignar usuarios.");
+  }
+
+  if (task.createdBy !== requesterId) {
+    throw new Error("Solo el creador puede desasignar usuarios.");
+  }
+
+  const updatedAssigned = (task.assignedTo || []).filter(
+    uid => uid !== targetUserId
+  );
+
+  await updateDoc(taskRef, {
+    assignedTo: updatedAssigned
+  });
+};
+

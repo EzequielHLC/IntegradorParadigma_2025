@@ -35,6 +35,7 @@ export default function App() {
     const [editingTaskId, setEditingTaskId] = useState(null);
     const [userGroups, setUserGroups] = useState([]);
     const [userProfile, setUserProfile] = useState(null); // Para tags personalizados guardados
+    const [userMap, setUserMap] = useState({});
 
     // Estados UI
     const [showGroupModal, setShowGroupModal] = useState(false);
@@ -82,7 +83,21 @@ export default function App() {
                     // Clasificamos entre grupos vivos y grupos fantasma
                     groupDocs.forEach(gDoc => {
                         if (gDoc.exists()) {
-                            validGroups.push({ id: gDoc.id, ...gDoc.data() });
+                            const groupData = gDoc.data();
+
+                            // Construimos diccionario UID -> Nombre
+                            const memberNames = {};
+                            (groupData.members || []).forEach(uid => {
+                                const userDocRef = doc(db, 'users', uid);
+                                // esto se resuelve en paralelo más abajo
+                            });
+
+                            validGroups.push({
+                                id: gDoc.id,
+                                ...groupData,
+                                memberNames: groupData.memberNames || {}
+                            });
+
                         } else {
                             // Si el documento no existe, guardamos el ID para borrarlo
                             invalidIds.push(gDoc.id);
@@ -112,6 +127,34 @@ export default function App() {
         });
         return () => unsubUser();
     }, [user]);
+
+    // 1.5. Cargar diccionario global UID -> Nombre (para mostrar asignados)
+    useEffect(() => {
+        if (!user) return;
+
+        const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+            const map = {};
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+
+                map[doc.id] =
+                    data.username ||      
+                    data.name ||          
+                    data.displayName ||
+                    data.fullName ||
+                    data.alias ||
+                    data.email ||         
+                    'Usuario';
+            });
+
+            setUserMap(map);
+        });
+
+        return () => unsub();
+    }, [user]);
+
+
 
     // 2. Cargar Tareas según Contexto
     useEffect(() => {
@@ -212,11 +255,30 @@ export default function App() {
             if (editingTaskId) {
                 await updateDoc(doc(db, collectionPath, editingTaskId), payload);
             } else {
-                await addDoc(collection(db, collectionPath), {
+
+                const baseTaskData = {
                     ...payload,
                     completed: false,
                     completedBy: []
+                };
+
+                // SOLO tareas de grupo tienen creador y asignados
+                const groupExtraData = context !== 'personal'
+                    ? {
+                        createdBy: user.uid,
+                        assignedTo:
+                            context.completionMode === 'all'
+                                ? [...(context.members || [])]   
+                                : []                              
+                    }
+                    : {};
+
+
+                await addDoc(collection(db, collectionPath), {
+                    ...baseTaskData,
+                    ...groupExtraData
                 });
+
             }
 
             setFormTask({ name: '', details: '', dueDate: '', tags: [] });
@@ -241,15 +303,36 @@ export default function App() {
         setShowAddForm(true);
     };
 
-
     // --- ACCIONES TAREA ---
     const handleTaskToggle = async (task) => {
-        const path = context === 'personal' ? `users/${user.uid}/tasks` : `groups/${context.id}/tasks`;
-        const mode = context === 'personal' ? 'single' : context.completionMode;
-        // Extraemos la colección base de la ruta
-        const collectionRef = path.split('/tasks')[0] + '/tasks';
-        await toggleTaskCompletion(collectionRef, task.id, user.uid, task, mode);
+
+        // --- VALIDACIÓN CORRECTA SEGÚN TIPO DE GRUPO ---
+
+        // 1. Tareas personales → siempre permitido
+        if (context === 'personal') {
+            const path = `users/${user.uid}/tasks`;
+            await toggleTaskCompletion(path, task.id, user.uid, task, 'single');
+            return;
+        }
+
+        // 2. Grupo ESTRICTO → cualquiera puede marcar
+        if (context.completionMode === 'all') {
+            const path = `groups/${context.id}/tasks`;
+            await toggleTaskCompletion(path, task.id, user.uid, task, 'all');
+            return;
+        }
+
+        // 3. Grupo COLABORATIVO → solo el creador
+        if (task.createdBy !== user.uid) {
+            alert("Solo el creador de la tarea puede marcarla como finalizada.");
+            return;
+        }
+
+        const path = `groups/${context.id}/tasks`;
+        await toggleTaskCompletion(path, task.id, user.uid, task, 'single');
     };
+
+
 
     const handleDeleteTask = async (taskId) => {
         if (window.confirm('¿Eliminar tarea?')) {
@@ -349,7 +432,12 @@ export default function App() {
                 setUserGroups(prev => prev.filter(g => g.id !== context.id));
             } else {
                 // Si el grupo se actualizó (ej. cambiaron el nombre), actualizamos el contexto
-                setContext(prev => ({ ...prev, ...docSnapshot.data() }));
+                setContext(prev => ({
+                    ...prev,
+                    ...docSnapshot.data(),
+                    members: docSnapshot.data().members || []
+                }));
+
             }
         });
 
@@ -596,7 +684,9 @@ export default function App() {
                             key={task.id}
                             task={task}
                             context={context}
+                            members={context.members || []}
                             currentUserId={user.uid}
+                            userMap={userMap}
                             onToggle={() => handleTaskToggle(task)}
                             onDelete={() => handleDeleteTask(task.id)}
                             onEdit={() => handleEditTask(task)}
