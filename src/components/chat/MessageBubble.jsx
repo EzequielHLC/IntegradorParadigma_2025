@@ -38,6 +38,24 @@ export const MessageBubble = ({ message, isOwn }) => {
     ? 'bg-blue-600 text-white rounded-br-none' 
     : `${getUserColor(message.uid)} rounded-bl-none`;
 
+    // Resolver createdAt que puede ser un Firestore Timestamp o un número/Date
+  const getDateFromCreatedAt = (createdAt) => {
+    if (!createdAt) return null;
+    // Firestore Timestamp tiene .toDate()
+    if (typeof createdAt.toDate === 'function') {
+      return createdAt.toDate();
+    }
+    // Si ya es un número (milis) o string, intentar convertir
+    const maybeDate = new Date(createdAt);
+    return isNaN(maybeDate.getTime()) ? null : maybeDate;
+  };
+
+  const date = getDateFromCreatedAt(message.createdAt);
+  const timeString = date
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '';
+
+
   return (
     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} mb-4`}>
       <div
@@ -49,7 +67,21 @@ export const MessageBubble = ({ message, isOwn }) => {
           </span>
         )}
         <p className="text-sm leading-relaxed wrap-break-word">{message.text}</p>
+        
+        {/* Hora dentro del mismo burbuja, en pequeño y semi-opaco */}
+        {timeString && (
+          <div className="mt-2 text-[11px] opacity-70">
+            <span className="text-gray-200">{/* para mensajes propios el texto debe contrastar */}</span>
+          </div>
+        )}
       </div>
+
+      {/* Hora fuera de la burbuja, alineada a la misma dirección */}
+      {timeString && (
+        <div className={`text-[11px] mt-1 opacity-70 ${isOwn ? 'text-right text-gray-500' : 'text-left text-gray-600'}`}>
+          {timeString}
+        </div>
+      )}
     </div>
   );
 };

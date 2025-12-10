@@ -75,6 +75,36 @@ export const joinGroup = async (userId, groupName, inputCode) => {
     transaction.update(userRef, { groups: arrayUnion(groupId) });
   });
 
+  // --- Después de la transacción de unión ---
+  // Obtener nombre de usuario desde el documento de usuario para mostrarlo en la notificación
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userDocRef);
+    let rawName = 'Usuario';
+    if (userSnap.exists()) {
+      const ud = userSnap.data();
+      rawName = ud.username || ud.email || rawName;
+    }
+    // Normalizar para quitar dominio si viene en formato email (p.ej. nombre@taskflow.local)
+    const shortName = (typeof rawName === 'string' && rawName.includes('@'))
+      ? rawName.split('@')[0]
+      : rawName;
+    
+    // Crear mensaje de sistema en la colección de mensajes del grupo
+    const messagesRef = collection(db, 'groups', groupId, 'messages');
+    await addDoc(messagesRef, {
+      text: `${shortName} se ha unido al grupo.`,
+      uid: 'system',             // identificador simple para mensajes de sistema
+      displayName: 'Sistema',    // etiqueta que se mostrará como autor
+      system: true,              // campo opcional para distinguir el mensaje en UI si quieres
+      createdAt: serverTimestamp()
+    });
+  } catch (err) {
+    // No interrumpe la funcionalidad principal si falla la notificación,
+    // pero registra el error para diagnóstico.
+    console.error('Error creando notificación de entrada al grupo:', err);
+  }
+
   return groupId;
 };
 
@@ -208,10 +238,15 @@ export const sendGroupMessage = async (groupId, user, text) => {
   if (!text.trim()) return;
   
   const messagesRef = collection(db, 'groups', groupId, 'messages');
+  const rawName = user.displayName || user.email || "Usuario";
+  const displayName = typeof rawName === 'string' && rawName.includes('@')
+    ? rawName.split('@')[0]
+    : rawName;
+
   await addDoc(messagesRef, {
     text: text,
     uid: user.uid,
-    displayName: user.displayName || user.email || "Usuario", // Fallback simple
+    displayName,
     createdAt: serverTimestamp()
   });
 };
