@@ -280,13 +280,18 @@ export default function App() {
                 await toggleTaskCompletion(path, task.id, user.uid, task, 'all');
                 return;
             }
-            // collaborative: solo creador puede marcar
-            if (task.createdBy !== user.uid) {
-                alert('Solo el creador de la tarea puede marcarla como finalizada.');
+            // En colaborativos: puede marcar el creador y los asignados
+            const isCreator = task.createdBy === user.uid;
+            const isAssigned = task.assignedTo?.includes(user.uid);
+
+            if (!isCreator && !isAssigned) {
+                alert("Solo el creador o los usuarios asignados pueden marcar esta tarea.");
                 return;
             }
+
             const path = `groups/${context.id}/tasks`;
             await toggleTaskCompletion(path, task.id, user.uid, task, 'single');
+
         } catch (err) {
             console.error(err);
             alert('Error al actualizar status');
