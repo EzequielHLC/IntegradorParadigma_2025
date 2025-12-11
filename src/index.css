@@ -1,1 +1,51 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  /* Botones con alto contraste y focus visible para accesibilidad */
+  .btn-primary {
+    @apply bg-blue-700 text-white hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg px-5 py-2.5 transition-all shadow-sm hover:shadow-md active:scale-95;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300 focus:ring-4 focus:ring-slate-100 font-medium rounded-lg px-5 py-2.5 transition-all;
+  }
+
+  .btn-danger {
+    @apply bg-white text-red-700 border-2 border-red-200 hover:bg-red-50 hover:border-red-300 focus:ring-4 focus:ring-red-100 font-medium rounded-lg px-5 py-2.5 transition-all;
+  }
+
+  /* Inputs más legibles */
+  .input-modern {
+    @apply bg-white border-2 border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-3 transition-colors;
+  }
+
+  /* Tarjetas con mejor definición */
+  .card-modern {
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5;
+  }
+
+  /* Scrollbar personalizado para el sidebar oscuro */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent; 
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #475569; /* slate-600 */
+    border-radius: 20px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8; /* slate-400 */
+  }
+}
